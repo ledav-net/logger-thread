@@ -29,16 +29,8 @@ static void *thread_func_write(unsigned long output_max)
 
     for (int seq = 0; seq < output_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;
-
-        while (wrq->lines[index].ready) {
-            fprintf(stderr, "W%02d! Queue full ...\n", th);
-            usleep(100);
-        }
-        clock_gettime(CLOCK_MONOTONIC, &wrq->lines[index].ts);
-        sprintf(wrq->lines[index].str, "W%02d %lu => %d", th, wrq->wr_seq, index);
-        fprintf(stderr, "W%02d> '%s'\n", th, wrq->lines[index].str);
-        wrq->lines[index].ready = true;
-        wrq->wr_seq++;
+        logger_printf(wrq, LOGGER_LEVEL_NOTICE, __FILE__, __FUNCTION__, __LINE__,
+                     "W%02d %lu => %d", th, wrq->wr_seq, index);
     }
     fprintf(stderr, "W%02d! Exit\n", th);
     return NULL;
@@ -56,10 +48,6 @@ int main(int argc, char **argv)
 
     logger_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONE);
 
-    if (thread_max == 1) {
-        fprintf(stderr, "Waiting a minute ...\n");
-        sleep(60);
-    }
     /* Writer threads */
     for (long i=0 ; i<thread_max ; i++ ) {
         pthread_create(&stdlogger->queues[i]->thread, NULL, (void *)thread_func_write, (void *)output_max);

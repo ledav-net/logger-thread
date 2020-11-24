@@ -18,6 +18,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdatomic.h>
 #include <time.h>
 
 #define LOGGER_LINE_SZ		64			/* Maximum size per log msg (\0 included) */
@@ -56,28 +57,36 @@ typedef struct {
     bool		ready;               /* Line ready to be printed */
     struct timespec	ts;                  /* Timestamp (key to order on) */
     logger_line_level_t level;               /* Level of this line */
+    const char *	file;		     /* File who generated the log */
+    const char *	func;		     /* Function */
+    unsigned int	line;		     /* Line */
     char		str[LOGGER_LINE_SZ]; /* Line buffer */
 } logger_line_t;
+
+struct logger_t;
 
 /* Write queue: 1 per thread */
 typedef struct {
     logger_line_t	*lines;    /* Lines buffer */
     int			lines_nr;  /* Maximum number of buffered lines for this thread */
     int			queue_idx; /* This queue index */
+    atomic_int		waiting;   /* True (1) if the thread is waiting for free space ... */
     unsigned int	rd_idx;    /* Read index */
     unsigned long	rd_seq;    /* Read sequence */
     unsigned long	wr_seq;    /* Write sequence */
     long		lost;	   /* Number of lost records */
+    struct logger_t	*logger;   /* Logger queue this write queue belongs to */
     pthread_t		thread;    /* Write thread owning this queue */
 } logger_write_queue_t;
 
-typedef struct {
+typedef struct logger_t {
     logger_write_queue_t **queues;	/* Write queues, 1 per thread */
     int			 queues_nr;	/* Number of queues */
     logger_opts_t	 options;	/* Queue options */
     bool		 terminate;     /* Set to true when the reader thread has to finish */
     pthread_t		 reader_thread; /* TID of the reader thread */
     bool		 empty;		/* Set to true when all the queues are empty */
+    atomic_int		 waiting;	/* Futex to old the number of waiting loggers (0 or 1) */
 } logger_t;
 
 typedef struct {

@@ -13,24 +13,40 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <errno.h>
-#include <pthread.h>
+
+#define _GNU_SOURCE
+#include <linux/futex.h>
+#include <sys/syscall.h>
 #include <stdatomic.h>
+#include <pthread.h>
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include <unistd.h>
+#include <string.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <time.h>
 
 #include "logger.h"
 
-#define STON(v) ((v)*1000000000) /* Sec -> nSec */
-#define NTOS(v) ((v)/1000000000) /* nSec -> Sec */
+#define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
+#define STON(v) ((v)*1000000000) /*  Sec -> nSec */
+#define MTON(v) ((v)*1000000)    /* mSec -> nSec */
+#define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
 #define swap_unsafe(a, b) { __typeof__ (a) _t = (a); (a) = (b); (b) = (_t); }
 
 logger_t *stdlogger = NULL;
+
+#define futex_wait(addr, val)	_futex(addr, FUTEX_WAIT_PRIVATE, val)
+#define futex_wake(addr, val)	_futex(addr, FUTEX_WAKE_PRIVATE, val)
+
+static inline int _futex(atomic_int *uaddr, int futex_op, int val)
+{
+    /* Note: We don't use the last 3 parameters */
+    return syscall(SYS_futex, uaddr, futex_op, val, NULL);
+}
 
 static int _logger_write_line(logger_opts_t options, logger_line_t *line)
 {
@@ -123,7 +139,11 @@ static void *_thread_logger(logger_t *q)
             if (q->terminate) {
                 break;
             }
-            usleep(200);
+            atomic_store(&q->waiting, 1);
+            if (futex_wait(&q->waiting, 1) < 0 && errno != EAGAIN) {
+                fprintf(stderr, "RDR! ERROR: %m !\n");
+                return NULL;
+            }
             continue;
         }
         q->empty = false;
@@ -137,17 +157,6 @@ static void *_thread_logger(logger_t *q)
     }
     fprintf(stderr, "RDR! Exit\n");
     return NULL;
-}
-
-static inline void _logger_deinit_write_queue(logger_write_queue_t *wrq)
-{
-    free(wrq->lines);
-}
-
-static inline void _logger_init_write_queue(logger_write_queue_t *wrq, int lines_max)
-{
-    wrq->lines = calloc(lines_max, sizeof(logger_line_t));
-    wrq->lines_nr = lines_max;
 }
 
 logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, logger_opts_t options)
@@ -164,8 +173,10 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
 
     for (int i=0 ; i < write_queues_max ; i++) {
         logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
-        _logger_init_write_queue(wrq, lines_max);
+        wrq->lines = calloc(lines_max, sizeof(logger_line_t));
+        wrq->lines_nr = lines_max;
         wrq->queue_idx = i;
+        wrq->logger = q;
         q->queues[i] = wrq;
     }
     /* Reader thread */
@@ -179,9 +190,13 @@ void logger_deinit(logger_t *_q)
     logger_t *q = _q ?: stdlogger;
 
     q->terminate = true;
+    atomic_store(&q->waiting, 0);
+    if (atomic_compare_exchange_strong(&q->waiting, &(atomic_int){ 1 }, 0)) {
+        fprintf(stderr,"futex_wake() = %d\n", futex_wake(&q->waiting, 1));
+    }
     pthread_join(q->reader_thread, NULL);
     for (int i=0 ; i<q->queues_nr; i++) {
-        _logger_deinit_write_queue(q->queues[i]);
+        free(q->queues[i]->lines);
     }
     free(q->queues);
     free(q);
@@ -208,5 +223,43 @@ int logger_printf(logger_write_queue_t *wrq, logger_line_level_t level,
         unsigned int line,
         const char *format, ...)
 {
+    va_list ap;
+    int th = wrq->queue_idx;
+    int index = wrq->wr_seq % wrq->lines_nr;
+    logger_line_t *l = &wrq->lines[index];
+    logger_t *logger = wrq->logger;
+
+    while (l->ready) {
+        fprintf(stderr, "W%02d! Queue full ...\n", th);
+        if (atomic_compare_exchange_strong(&logger->waiting, &(atomic_int){ 1 }, 0)) {
+            /* Wake-up lazy guy, there is something to do ! */
+            fprintf(stderr, "W%02d! Waking up the logger ...\n", th);
+            if (futex_wake(&logger->waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
+                fprintf(stderr, "W%02d! ERROR: %m !\n", th);
+                return -1;
+            }
+            continue;
+        }
+        usleep(50);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &l->ts);
+    l->file = src;
+    l->func = func;
+    l->line = line;
+    va_start(ap, format);
+    vsprintf(l->str, format, ap);
+
+    fprintf(stderr, "W%02d> '%s'\n", th, l->str);
+
+    l->ready = true;
+    wrq->wr_seq++;
+
+    if (atomic_compare_exchange_strong(&logger->waiting, &(atomic_int){ 1 }, 0)) {
+        /* Wake-up lazy guy, there is something to do ! */
+        fprintf(stderr, "W%02d! Waking up the logger ...\n", th);
+        if (futex_wake(&logger->waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
+            return -1;
+        }
+    }
     return 0;
 }
