@@ -48,7 +48,7 @@ typedef enum {
 typedef enum {
     LOGGER_OPT_NONE	= 0,	/* No options. Use default values ! */
     LOGGER_OPT_PID	= 1,	/* Add the pid of the actual process on each lines. */
-    LOGGER_OPT_PERROR	= 2,	/* log also the message to stderr. */
+    LOGGER_OPT_NONBLOCK	= 2,	/* return -1 and EAGAIN when the queue is full */
     LOGGER_OPT_SYNC	= 4,	/* Return from printlog when message is really saved. */
 } logger_opts_t;
 

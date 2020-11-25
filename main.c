@@ -42,15 +42,16 @@ static void *thread_func_write(unsigned long output_max)
         struct timespec before, after;
         clock_gettime(CLOCK_MONOTONIC, &before);
 
-        LOG_NOTICE("W%02d %lu => %d", th, seq, index);
-
+        if ( LOG_NOTICE("W%02d %lu => %d", th, seq, index) < 0 ) {
+            fprintf(stderr, "W%02d! %lu => %d **LOST** (%m)\n", th, seq, index);
+        }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
         usec = after.tv_nsec - before.tv_nsec;
         fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
                         th, after.tv_nsec, usec, index);
     }
-    fprintf(stderr, "W%02d! Exit\n", th);
+    fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost);
     return NULL;
 }
 
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
 
     srand(time(NULL));
 
-    logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONE);
+    logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONBLOCK);
 
     /* Writer threads */
     for (long i=0 ; i<thread_max ; i++ ) {

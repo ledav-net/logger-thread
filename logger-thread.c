@@ -254,7 +254,12 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
                 fprintf(stderr, "W%02d! ERROR: %m !\n", th);
                 return -1;
             }
+            usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
             continue;
+        }
+        if (logger->options & LOGGER_OPT_NONBLOCK) {
+            fprintf(stderr, "W%02d! Line dropped (%d so far) !\n", th, ++wrq->lost);
+            return errno = EAGAIN, -1;
         }
         usleep(50);
     }
