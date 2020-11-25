@@ -39,20 +39,22 @@
 
 logger_t *stdlogger = NULL;
 
-#define futex_wait(addr, val)	_futex(addr, FUTEX_WAIT_PRIVATE, val)
-#define futex_wake(addr, val)	_futex(addr, FUTEX_WAKE_PRIVATE, val)
+#define futex_wait(addr, val)		_futex((addr), FUTEX_WAIT_PRIVATE, (val), NULL)
+#define futex_timed_wait(addr, val, ts)	_futex((addr), FUTEX_WAIT_PRIVATE, (val), (ts))
+#define futex_wake(addr, val)		_futex((addr), FUTEX_WAKE_PRIVATE, (val), NULL)
 
-static inline int _futex(atomic_int *uaddr, int futex_op, int val)
+static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
 {
-    /* Note: We don't use the last 3 parameters */
-    return syscall(SYS_futex, uaddr, futex_op, val, NULL);
+    /* Note: not using the last 2 parameters uaddr2 & val2 (see man futex(2)) */
+    return syscall(SYS_futex, uaddr, futex_op, val, tv);
 }
 
-static int _logger_write_line(logger_opts_t options, logger_line_t *line)
+static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 {
     char buf[LOGGER_LINE_SZ+16];
-    unsigned long ts = STON(line->ts.tv_sec) + line->ts.tv_nsec;
-    int len = sprintf(buf, "LOG> %lu %d %s\n", ts, line->level, line->str);
+    unsigned long ts = STON(l->ts.tv_sec) + l->ts.tv_nsec;
+    int len = sprintf(buf, "LOG> %lu [%d] %s:%s:%d> %s\n"
+                     , ts, l->level, l->file, l->func, l->line, l->str);
     write(1, buf, len);
     return 0;
 }
@@ -113,7 +115,7 @@ static int _logger_enqueue_next_lines(_logger_fuse_entry_t *fuse, int fuse_nr, i
 
         _bubble_fuse_up(fuse, fuse_nr); /* Let him find it's place */
     }
-    /* Let's get a look at the empty queues as well. While we are at it ... */
+    /* Let see if there is something new in the empty queues... */
     int rv = 0;
     for (int i=0, last=fuse_nr-1; i<empty_nr; i++) {
         rv += _logger_set_queue_entry(fuse[last].wrq, &fuse[last]);
@@ -135,11 +137,11 @@ static void *_thread_logger(logger_t *q)
 
         if (fuse_queue[0].ts == ~0) {
             q->empty = true;
-            fprintf(stderr, "RDR! Print queue empty ... Zzzzzzz\n");
             if (q->terminate) {
                 break;
             }
             atomic_store(&q->waiting, 1);
+            fprintf(stderr, "RDR! Print queue empty ... Zzzzzzz\n");
             if (futex_wait(&q->waiting, 1) < 0 && errno != EAGAIN) {
                 fprintf(stderr, "RDR! ERROR: %m !\n");
                 return NULL;
@@ -164,7 +166,7 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
     logger_t *q;
 
     if (!write_queues_max) {
-        return errno = ECHILD, NULL; // No child processes (No readers, nothing to do ...)
+        return errno = EINVAL, NULL; // No readers, nothing to do ...
     }
     q = calloc(1, sizeof(logger_t));
     q->queues = calloc(write_queues_max, sizeof(logger_write_queue_t *));
@@ -182,19 +184,26 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
     /* Reader thread */
     pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
 
-    return stdlogger = q;
+    return q;
 }
 
 void logger_deinit(logger_t *_q)
 {
     logger_t *q = _q ?: stdlogger;
 
+    /* Sync with the logger & force him to double-check the queues */
+    while (!q->waiting) {
+        fprintf(stderr, "Waiting for logger ...\n");
+        usleep(100);
+    }
     q->terminate = true;
     atomic_store(&q->waiting, 0);
-    if (atomic_compare_exchange_strong(&q->waiting, &(atomic_int){ 1 }, 0)) {
-        fprintf(stderr,"futex_wake() = %d\n", futex_wake(&q->waiting, 1));
+    if (futex_wake(&q->waiting, 1) <= 0) {
+        fprintf(stderr, "Logger did not woke up (%m) !\n");
+    } else {
+        fprintf(stderr, "Joining logger ...\n");
+        pthread_join(q->reader_thread, NULL);
     }
-    pthread_join(q->reader_thread, NULL);
     for (int i=0 ; i<q->queues_nr; i++) {
         free(q->queues[i]->lines);
     }
@@ -202,9 +211,9 @@ void logger_deinit(logger_t *_q)
     free(q);
 }
 
-logger_write_queue_t *logger_get_std_write_queue(void)
+logger_write_queue_t *logger_get_write_queue(logger_t *logger)
 {
-    if (!stdlogger) {
+    if (!logger) {
         return errno = EBADF, NULL;
     }
     pthread_t th = pthread_self();
@@ -217,17 +226,24 @@ logger_write_queue_t *logger_get_std_write_queue(void)
     return errno = ECHILD, NULL;
 }
 
-int logger_printf(logger_write_queue_t *wrq, logger_line_level_t level,
+int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level_t level,
         const char *src,
         const char *func,
         unsigned int line,
         const char *format, ...)
 {
     va_list ap;
-    int th = wrq->queue_idx;
+
+    if (logger->terminate) {
+        fprintf(stderr, "Queue is closed !\n");
+        return errno = ESHUTDOWN, -1;
+    }
+    if (!wrq) {
+        wrq = logger_get_write_queue(logger);
+    }
     int index = wrq->wr_seq % wrq->lines_nr;
+    int th = wrq->queue_idx;
     logger_line_t *l = &wrq->lines[index];
-    logger_t *logger = wrq->logger;
 
     while (l->ready) {
         fprintf(stderr, "W%02d! Queue full ...\n", th);
@@ -242,11 +258,13 @@ int logger_printf(logger_write_queue_t *wrq, logger_line_level_t level,
         }
         usleep(50);
     }
+    va_start(ap, format);
+
     clock_gettime(CLOCK_MONOTONIC, &l->ts);
+    l->level = level;
     l->file = src;
     l->func = func;
     l->line = line;
-    va_start(ap, format);
     vsprintf(l->str, format, ap);
 
     fprintf(stderr, "W%02d> '%s'\n", th, l->str);

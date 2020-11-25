@@ -101,104 +101,108 @@ logger_t *		logger_init(			/* Initialize the logger manager */
 
 void			logger_deinit(logger_t *logger); /* Empty the queues and free all the ressources */
 
-logger_write_queue_t *	logger_get_std_write_queue(void); /* Get the write queue allocated for the calling thread */
+logger_write_queue_t *	logger_get_write_queue(logger_t *logger);
 
-int			logger_printf(logger_write_queue_t *wrq,	/* Write queue to print to */
+int			logger_printf(logger_t *logger,			/* Print a message */
+                            logger_write_queue_t *wrq,			/* Write queue to print to */
                             logger_line_level_t level,			/* Importance level of this print */
                             const char *src,				/* Source/Func/Line this print was issued */
                             const char *func,
                             unsigned int line,
                             const char *format, ...);			/* printf() like format & arguments ... */
 
-#define LOGGER_COLORS_ENABLED 1
-//#define LOGGER_DISABLED 1
-
-#define LOGGER_LEVEL_TRUNCATE	LOGGER_LEVEL_INFO	/* Higher levels than INFO are not handled */
-#define LOGGER_STD_DESCRIPTOR	stdlogger
-
 extern logger_t *	stdlogger; /* Default logger context to use when using the below LOG_* macros */
 
+#define logger_std_init			stdlogger = logger_init
+#define logger_std_deinit()		logger_deinit(stdlogger)
+#define logger_std_get_write_queue()	logger_get_write_queue(stdlogger)
+#define logger_std_printf(fmt, ...)	logger_printf(stdlogger, NULL, fmt, ## __VA_ARGS__)
+
+#define LOGGER_COLORS_ENABLED
+//#define LOGGER_DISABLED
+
+#define LOGGER_LEVEL_TRUNCATE	LOGGER_LEVEL_INFO	/* Higher levels than INFO are not handled */
+
 #ifndef LOGGER_DISABLED
-#define LOG_EMERGENCY(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+#define LOG_EMERGENCY(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_EMERGENCY, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_ALERT(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_ALERT(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_ALERT, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_CRITICAL(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_CRITICAL(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_CRITICAL, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_ERROR(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_ERROR(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_ERROR, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_WARNING(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_WARNING(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_WARNING, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    __COLUMN__, \
-    f, ## __VA_ARGS__)
-#define LOG_NOTICE(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_NOTICE(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_NOTICE, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_INFO(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_INFO(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_INFO, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_DEBUG(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_DEBUG(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_DEBUG, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_OKAY(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_OKAY(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_OKAY, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_OOPS(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_OOPS(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_OOPS, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
-#define LOG_TRACE(f, ...)	logger_printf(LOGGER_STD_DESCRIPTOR, \
+    fmt, ## __VA_ARGS__)
+#define LOG_TRACE(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_TRACE, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
-    f, ## __VA_ARGS__)
+    fmt, ## __VA_ARGS__)
 #else
-#define LOG_EMERGENCY(f, ...)
-#define LOG_ALERT(f, ...)
-#define LOG_CRITICAL(f, ...)
-#define LOG_ERROR(f, ...)
-#define LOG_WARNING(f, ...)
-#define LOG_NOTICE(f, ...)
-#define LOG_INFO(f, ...)
-#define LOG_DEBUG(f, ...)
+#define LOG_EMERGENCY(...)
+#define LOG_ALERT(...)
+#define LOG_CRITICAL(...)
+#define LOG_ERROR(...)
+#define LOG_WARNING(...)
+#define LOG_NOTICE(...)
+#define LOG_INFO(...)
+#define LOG_DEBUG(...)
 
-#define LOG_OKAY(f, ...)
-#define LOG_OOPS(f, ...)
-#define LOG_TRACE(f, ...)
+#define LOG_OKAY(...)
+#define LOG_OOPS(...)
+#define LOG_TRACE(...)
 #endif /* LOGGER_DISABLED */
 
 #endif /* _LOGGER_H */

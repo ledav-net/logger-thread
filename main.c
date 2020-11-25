@@ -21,16 +21,34 @@
 
 #include "logger.h"
 
+#define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
+#define STON(v) ((v)*1000000000) /*  Sec -> nSec */
+#define MTON(v) ((v)*1000000)    /* mSec -> nSec */
+#define MTOU(v) ((v)*1000)       /* mSec -> uSec */
+
 /* Test thread */
 static void *thread_func_write(unsigned long output_max)
 {
-    logger_write_queue_t *wrq = logger_get_std_write_queue();
+    logger_write_queue_t *wrq = logger_std_get_write_queue();
     int th = wrq->queue_idx;
 
     for (int seq = 0; seq < output_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;
-        logger_printf(wrq, LOGGER_LEVEL_NOTICE, __FILE__, __FUNCTION__, __LINE__,
-                     "W%02d %lu => %d", th, wrq->wr_seq, index);
+
+        unsigned long usec = MTOU(1 + rand() % 1000);
+        if (usec > MTOU(900)) {
+            usleep(usec);
+        }
+        struct timespec before, after;
+        clock_gettime(CLOCK_MONOTONIC, &before);
+
+        LOG_NOTICE("W%02d %lu => %d", th, seq, index);
+
+        clock_gettime(CLOCK_MONOTONIC, &after);
+
+        usec = after.tv_nsec - before.tv_nsec;
+        fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
+                        th, after.tv_nsec, usec, index);
     }
     fprintf(stderr, "W%02d! Exit\n", th);
     return NULL;
@@ -46,7 +64,9 @@ int main(int argc, char **argv)
     int lines_max = atoi(argv[2]);
     unsigned long output_max = atoi(argv[3]);
 
-    logger_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONE);
+    srand(time(NULL));
+
+    logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONE);
 
     /* Writer threads */
     for (long i=0 ; i<thread_max ; i++ ) {
