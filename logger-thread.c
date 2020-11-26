@@ -37,6 +37,11 @@
 
 #define swap_unsafe(a, b) { __typeof__ (a) _t = (a); (a) = (b); (b) = (_t); }
 
+typedef struct {
+    unsigned long         ts;  /* Key to sort on (ts of current line) */
+    logger_write_queue_t *wrq; /* Related write queue */
+} _logger_fuse_entry_t;
+
 logger_t *stdlogger = NULL;
 
 #define futex_wait(addr, val)		_futex((addr), FUTEX_WAIT_PRIVATE, (val), NULL)
@@ -130,6 +135,9 @@ static void *_thread_logger(logger_t *q)
     int empty_nr = 0;
     _logger_fuse_entry_t fuse_queue[q->queues_nr];
 
+    fprintf(stderr, "_logger_fuse_entry_t = %d (%d)\n",
+                    sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
+
     empty_nr = _logger_init_lines_queue(q, fuse_queue, q->queues_nr);
 
     while (1) {
@@ -184,6 +192,8 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
     /* Reader thread */
     pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
 
+    fprintf(stderr, "logger_line_t = %d (%d)\n",
+                    sizeof(logger_line_t), sizeof(logger_line_t) * lines_max);
     return q;
 }
 

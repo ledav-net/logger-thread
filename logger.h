@@ -89,11 +89,6 @@ typedef struct logger_t {
     atomic_int		 waiting;	/* Futex to old the number of waiting loggers (0 or 1) */
 } logger_t;
 
-typedef struct {
-    unsigned long         ts;  /* Key to sort on (ts of current line) */
-    logger_write_queue_t *wrq; /* Related write queue */
-} _logger_fuse_entry_t;
-
 logger_t *		logger_init(			/* Initialize the logger manager */
                             unsigned int queues_max,	/* Number of writer threads. If 0 => Print log lines directly */
                             unsigned int lines_max,	/* Maximum number of log lines to buffer */

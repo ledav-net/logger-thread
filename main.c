@@ -26,17 +26,23 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
+typedef struct {
+    unsigned long output_max;
+    int uwait;
+    int luck;
+} _thread_params;
+
 /* Test thread */
-static void *thread_func_write(unsigned long output_max)
+static void *thread_func_write(const _thread_params *thp)
 {
     logger_write_queue_t *wrq = logger_std_get_write_queue();
     int th = wrq->queue_idx;
 
-    for (int seq = 0; seq < output_max; seq++) {
+    for (int seq = 0; seq < thp->output_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;
 
-        unsigned long usec = MTOU(1 + rand() % 1000);
-        if (usec > MTOU(900)) {
+        unsigned long usec = MTOU(1 + rand() % thp->uwait);
+        if (!(rand() % thp->luck)) {
             usleep(usec);
         }
         struct timespec before, after;
@@ -57,21 +63,29 @@ static void *thread_func_write(unsigned long output_max)
 
 int main(int argc, char **argv)
 {
-    if (argc < 4) {
-        printf("%s <threads> <buffer> <output per thread>\n", argv[0]);
+    if (argc < 6) {
+        printf("%s <threads> <buffer> <output per thread> <us wait> <luck>\n", argv[0]);
         return 1;
     }
     int	thread_max = atoi(argv[1]);
     int lines_max = atoi(argv[2]);
-    unsigned long output_max = atoi(argv[3]);
+
+    _thread_params thp = {
+        atoi(argv[3]),
+        atoi(argv[4]),
+        atoi(argv[5]),
+    };
 
     srand(time(NULL));
+
+    fprintf(stderr, "thread_max[%d] lines_max[%d] output_max[%d]\n"
+                    , thread_max, lines_max, thp.output_max);
 
     logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONBLOCK);
 
     /* Writer threads */
     for (long i=0 ; i<thread_max ; i++ ) {
-        pthread_create(&stdlogger->queues[i]->thread, NULL, (void *)thread_func_write, (void *)output_max);
+        pthread_create(&stdlogger->queues[i]->thread, NULL, (void *)thread_func_write, (void *)&thp);
     }
     for (int i=0 ; i<thread_max ; i++ ) {
         pthread_join(stdlogger->queues[i]->thread, NULL);
