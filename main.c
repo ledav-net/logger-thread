@@ -29,6 +29,9 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
+// Uncomment to strip all the debug lines for this source.
+//#define fprintf
+
 typedef struct {
     unsigned long output_max;
     int uwait;

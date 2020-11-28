@@ -49,6 +49,9 @@ logger_t *stdlogger = NULL;
 #define futex_timed_wait(addr, val, ts)	_futex((addr), FUTEX_WAIT_PRIVATE, (val), (ts))
 #define futex_wake(addr, val)		_futex((addr), FUTEX_WAKE_PRIVATE, (val), NULL)
 
+// Uncomment to strip all the debug lines for this source.
+//#define fprintf
+
 static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
 {
     /* Note: not using the last 2 parameters uaddr2 & val2 (see man futex(2)) */
