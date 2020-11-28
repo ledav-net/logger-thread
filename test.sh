@@ -13,21 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-for ((i=0 ; i<1000; i++)); do
-	# Randmize between 1 & 10 threads with between 51 & 100 buffered lines
-	# repeated 1000x10000 times.
-	./logger 10 100 1000
-done > out.log 2>&1
+#        <threads> <max per queue> <max per thread> <us wait> <wait luck value> [delay sec]
+default=( 10        100             1000             10000     110               5         )
 
-# So, we expect to have 10 000 unique lines (10 threads x 1000 lines)
-# No outputs = Success.
-# Full output is in out.log
-grep ^LOG < out.log | cut -d" " -f 5 | sort | uniq -c | tail | grep -v 10000
+[ $# -gt 0 ] && params=(${*}) || params=(${default[*]})
 
-# And we should have the 10M lines
-max=10000000
-lines=$(grep ^LOG < out.log | wc -l)
-if [ $max -ne $lines ]; then
-	echo "Error: $lines lines !"
-	exit 1
-fi
+/usr/bin/time -v ./logger ${params[*]} > out.log 2>&1 &
+less -RS +F < out.log
