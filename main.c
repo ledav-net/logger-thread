@@ -29,6 +29,9 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
+#define timespec_to_ns(a) ((STON((a).tv_sec) + (a).tv_nsec))
+#define elapsed_ns(b,a) (timespec_to_ns(a) - timespec_to_ns(b))
+
 // Uncomment to strip all the debug lines for this source.
 //#define fprintf
 
@@ -59,9 +62,8 @@ static void *thread_func_write(const _thread_params *thp)
         }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
-        unsigned long usec = after.tv_nsec - before.tv_nsec;
         fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
-                        th, after.tv_nsec, usec, index);
+                        th, timespec_to_ns(after), elapsed_ns(before, after), index);
     }
     fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost);
     return NULL;

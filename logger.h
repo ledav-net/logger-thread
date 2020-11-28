@@ -113,6 +113,9 @@ extern logger_t *	stdlogger; /* Default logger context to use when using the bel
 #define logger_std_get_write_queue()	logger_get_write_queue(stdlogger)
 #define logger_std_printf(fmt, ...)	logger_printf(stdlogger, NULL, fmt, ## __VA_ARGS__)
 
+#define timespec_to_ns(a)	((STON((a).tv_sec) + (a).tv_nsec))
+#define elapsed_ns(b,a) 	(timespec_to_ns(a) - timespec_to_ns(b))
+
 #define LOGGER_COLORS_ENABLED
 //#define LOGGER_DISABLED
 

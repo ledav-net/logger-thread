@@ -36,6 +36,9 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
+#define timespec_to_ns(a) ((STON((a).tv_sec) + (a).tv_nsec))
+#define elapsed_ns(b,a) (timespec_to_ns(a) - timespec_to_ns(b))
+
 typedef struct {
     unsigned long         ts;  /* Key to sort on (ts of current line) */
     logger_write_queue_t *wrq; /* Related write queue */
@@ -92,7 +95,7 @@ static inline int _logger_set_queue_entry(const logger_write_queue_t *wrq, _logg
 
     if (wrq->lines[index].ready) { // when it's ready, we can proceed...
         struct timespec ts = wrq->lines[index].ts;
-        fuse->ts = STON(ts.tv_sec) + ts.tv_nsec;
+        fuse->ts = timespec_to_ns(ts);
     } else {
         fuse->ts = ~0; // Otherwise it's empty.
         return 1;
