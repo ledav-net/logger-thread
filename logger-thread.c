@@ -36,8 +36,6 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
-#define swap_unsafe(a, b) { __typeof__ (a) _t = (a); (a) = (b); (b) = (_t); }
-
 typedef struct {
     unsigned long         ts;  /* Key to sort on (ts of current line) */
     logger_write_queue_t *wrq; /* Related write queue */
@@ -70,17 +68,21 @@ static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 
 static inline void _bubble_fuse_up(_logger_fuse_entry_t *fuse, int fuse_nr)
 {
-    /* Sort the first entry following the bubble up logic */
-    for (int i=0; i<fuse_nr-1 && fuse[i].ts > fuse[i+1].ts; i++) { // Bigger move up (& stack empty ones at the end)
-        swap_unsafe(fuse[i], fuse[i+1]);
+    if (fuse_nr > 1 && fuse[0].ts > fuse[1].ts) {
+        register int i=0;
+        _logger_fuse_entry_t newentry = fuse[0]; // Strickly bigger move up (stack empty ones at the end)
+        do { fuse[i] = fuse[i+1]; i++; } while (i < fuse_nr-1 && newentry.ts > fuse[i+1].ts);
+        fuse[i] = newentry;
     }
 }
 
 static inline void _bubble_fuse_down(_logger_fuse_entry_t *fuse, int fuse_nr)
 {
-    /* Sort the last entry following the bubble down logic */
-    for (int i=fuse_nr-1; i>0 && fuse[i].ts <= fuse[i-1].ts; i--) { // Lower move down
-        swap_unsafe(fuse[i], fuse[i-1]);
+    if (fuse_nr > 1 && fuse[fuse_nr-1].ts <= fuse[fuse_nr-2].ts) {
+        register int i=fuse_nr-1;
+        _logger_fuse_entry_t newentry = fuse[i]; // Smaller & same move down (so, stack empty ones at top of smallers)
+        do { fuse[i] = fuse[i-1]; i--; } while (i > 0 && newentry.ts <= fuse[i-1].ts);
+        fuse[i] = newentry;
     }
 }
 
