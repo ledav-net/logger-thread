@@ -41,9 +41,9 @@ static void *thread_func_write(const _thread_params *thp)
     for (int seq = 0; seq < thp->output_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;
 
-        unsigned long usec = MTOU(1 + rand() % thp->uwait);
         if (!(rand() % thp->luck)) {
-            usleep(usec);
+            fprintf(stderr, "W%02d! Bad luck, waiting for %lu usec\n", th, thp->uwait);
+            usleep(thp->uwait);
         }
         struct timespec before, after;
         clock_gettime(CLOCK_MONOTONIC, &before);
@@ -53,7 +53,7 @@ static void *thread_func_write(const _thread_params *thp)
         }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
-        usec = after.tv_nsec - before.tv_nsec;
+        unsigned long usec = after.tv_nsec - before.tv_nsec;
         fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
                         th, after.tv_nsec, usec, index);
     }
@@ -64,28 +64,34 @@ static void *thread_func_write(const _thread_params *thp)
 int main(int argc, char **argv)
 {
     if (argc < 6) {
-        printf("%s <threads> <buffer> <output per thread> <us wait> <luck>\n", argv[0]);
+        printf("%s <threads> <max lines/buffer> <max lines per thread> <us wait> <wait luck value> [delay sec]\n", argv[0]);
         return 1;
     }
     int	thread_max = atoi(argv[1]);
     int lines_max = atoi(argv[2]);
-
     _thread_params thp = {
         atoi(argv[3]),
         atoi(argv[4]),
         atoi(argv[5]),
     };
-
+    int start_wait = 0;
+    if ( argc > 6 ) {
+        start_wait = atoi(argv[6]);
+    }
     srand(time(NULL));
 
-    fprintf(stderr, "thread_max[%d] lines_max[%d] output_max[%d]\n"
-                    , thread_max, lines_max, thp.output_max);
+    fprintf(stderr, "cmdline: "); for (int i=0; i<argc; i++) { fprintf(stderr, "%s ", argv[i]); }
+    fprintf(stderr, "\nthread_max[%d] lines_max[%d] output_max[%d] (1/%d chances to wait %d us)\n"
+                    , thread_max, lines_max, thp.output_max, thp.luck, thp.uwait);
+    fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
     logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONBLOCK);
+    sleep(start_wait);
 
     /* Writer threads */
     for (long i=0 ; i<thread_max ; i++ ) {
-        pthread_create(&stdlogger->queues[i]->thread, NULL, (void *)thread_func_write, (void *)&thp);
+        pthread_t *tid = &stdlogger->queues[i]->thread;
+        pthread_create(tid, NULL, (void *)thread_func_write, (void *)&thp);
     }
     for (int i=0 ; i<thread_max ; i++ ) {
         pthread_join(stdlogger->queues[i]->thread, NULL);
