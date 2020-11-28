@@ -186,18 +186,18 @@ extern logger_t *	stdlogger; /* Default logger context to use when using the bel
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #else
-#define LOG_EMERGENCY(...)
-#define LOG_ALERT(...)
-#define LOG_CRITICAL(...)
-#define LOG_ERROR(...)
-#define LOG_WARNING(...)
-#define LOG_NOTICE(...)
-#define LOG_INFO(...)
-#define LOG_DEBUG(...)
+#define LOG_EMERGENCY
+#define LOG_ALERT
+#define LOG_CRITICAL
+#define LOG_ERROR
+#define LOG_WARNING
+#define LOG_NOTICE
+#define LOG_INFO
+#define LOG_DEBUG
 
-#define LOG_OKAY(...)
-#define LOG_OOPS(...)
-#define LOG_TRACE(...)
+#define LOG_OKAY
+#define LOG_OOPS
+#define LOG_TRACE
 #endif /* LOGGER_DISABLED */
 
 #endif /* _LOGGER_H */
