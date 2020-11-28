@@ -15,6 +15,7 @@
  */
 
 #define _GNU_SOURCE
+
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <stdatomic.h>
@@ -191,6 +192,7 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
     }
     /* Reader thread */
     pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
+    pthread_setname_np(q->reader_thread, "logger-reader");
 
     fprintf(stderr, "logger_line_t = %d (%d)\n",
                     sizeof(logger_line_t), sizeof(logger_line_t) * lines_max);

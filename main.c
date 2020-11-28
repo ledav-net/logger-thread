@@ -13,6 +13,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#define _GNU_SOURCE
+
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -92,6 +95,7 @@ int main(int argc, char **argv)
     for (long i=0 ; i<thread_max ; i++ ) {
         pthread_t *tid = &stdlogger->queues[i]->thread;
         pthread_create(tid, NULL, (void *)thread_func_write, (void *)&thp);
+        pthread_setname_np(*tid, "logger-writer");
     }
     for (int i=0 ; i<thread_max ; i++ ) {
         pthread_join(stdlogger->queues[i]->thread, NULL);
