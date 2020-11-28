@@ -134,6 +134,7 @@ static void *_thread_logger(logger_t *q)
 {
     logger_write_queue_t *wrq;
     int empty_nr = 0;
+    int really_empty = 0;
     _logger_fuse_entry_t fuse_queue[q->queues_nr];
 
     fprintf(stderr, "_logger_fuse_entry_t = %d (%d)\n",
@@ -149,8 +150,17 @@ static void *_thread_logger(logger_t *q)
             if (q->terminate) {
                 break;
             }
+            if (really_empty < 5) {
+                fprintf(stderr, "RDR! Print queue empty. Double check in 0.2 ms ...\n");
+                really_empty++;
+                usleep(200);
+                /* Double-check (5 times) if the queue is really empty in 0.2 ms */
+                /* This avoid the writers to wakeup too frequently the reader in case of burst */
+                continue;
+            }
+            really_empty = 0;
+            fprintf(stderr, "RDR! Print queue REALLY empty ... Zzz\n");
             atomic_store(&q->waiting, 1);
-            fprintf(stderr, "RDR! Print queue empty ... Zzzzzzz\n");
             if (futex_wait(&q->waiting, 1) < 0 && errno != EAGAIN) {
                 fprintf(stderr, "RDR! ERROR: %m !\n");
                 return NULL;
@@ -158,6 +168,7 @@ static void *_thread_logger(logger_t *q)
             continue;
         }
         q->empty = false;
+        really_empty = 0;
 
         logger_write_queue_t *wrq = fuse_queue[0].wrq;
         int rv = _logger_write_line(q->options, &wrq->lines[wrq->rd_idx]);
