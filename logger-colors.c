@@ -19,8 +19,8 @@
 #include "logger.h"
 
 const char * const _logger_level_color[LOGGER_LEVEL_COUNT] = {
-    [LOGGER_LEVEL_EMERG]    = C_LR,
-    [LOGGER_LEVEL_ALERT]    = C_LR,
+    [LOGGER_LEVEL_EMERG]    = C_BR C_LW,
+    [LOGGER_LEVEL_ALERT]    = C_UNL C_LR,
     [LOGGER_LEVEL_CRITICAL] = C_LR,
     [LOGGER_LEVEL_ERROR]    = C_DR,
     [LOGGER_LEVEL_WARNING]  = C_DY,

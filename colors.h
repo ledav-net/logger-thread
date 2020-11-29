@@ -19,6 +19,9 @@
 #define C_RST	"\033[0m"	/* RESET */
 #define C_CLR	"\033[2j"	/* Clear screen */
 
+#define C_BLD	"\033[1m"       /* Only turn bold on */
+#define C_UNL	"\033[4m"       /* Only turn Underline on */
+
 #define C_DK	"\033[0;30m"    /* Dark Black */
 #define C_DR	"\033[0;31m"    /* Dark Red */
 #define C_DG	"\033[0;32m"    /* Dark Green */
