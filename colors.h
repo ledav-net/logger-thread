@@ -37,4 +37,22 @@
 #define C_LC	"\033[1;36m"    /* Light Cyan */
 #define C_LW	"\033[1;37m"    /* Light White */
 
+#define C_UK	"\033[4;30m"    /* Underline Black */
+#define C_UR	"\033[4;31m"    /* Underline Red */
+#define C_UG	"\033[4;32m"    /* Underline Green */
+#define C_UY	"\033[4;33m"    /* Underline Yellow */
+#define C_UB	"\033[4;34m"    /* Underline Blue */
+#define C_UM	"\033[4;35m"    /* Underline Magenta */
+#define C_UC	"\033[4;36m"    /* Underline Cyan */
+#define C_UW	"\033[4;37m"    /* Underline White */
+
+#define C_BK	"\033[40m"	/* Background Black */
+#define C_BR	"\033[41m"	/* Background Red */
+#define C_BG	"\033[42m"	/* Background Green */
+#define C_BY	"\033[43m"	/* Background Yellow */
+#define C_BB	"\033[44m"	/* Background Blue */
+#define C_BM	"\033[45m"	/* Background Magenta */
+#define C_BC	"\033[46m"	/* Background Cyan */
+#define C_BW	"\033[47m"	/* Background White */
+
 #endif
