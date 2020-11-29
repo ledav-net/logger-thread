@@ -72,7 +72,7 @@ static const char *_logger_get_time(unsigned long sec, _logger_line_colors_t *c)
     return time;
 }
 
-static int _logger_write_line(logger_opts_t options, bool colored, logger_line_t *l)
+static int _logger_write_line(logger_opts_t options, bool colored, const logger_write_queue_t *wrq, const logger_line_t *l)
 {
     char linestr[LOGGER_LINE_SZ+256];
     _logger_line_colors_t c;
@@ -96,12 +96,12 @@ static int _logger_write_line(logger_opts_t options, bool colored, logger_line_t
     int sec            = l->ts.tv_sec % 60;
     /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
-            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s>  %s\n",
+            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s <%lu> %s\n",
             _logger_get_date(l->ts.tv_sec, &c),
             _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
             c.level, logger_level_label[l->level], c.reset,
-            b, l->str);
+            b, wrq->thread, l->str);
     /* Print */
     return write(1, linestr, len);
 }
@@ -216,7 +216,7 @@ void *_thread_logger(logger_t *q)
         really_empty = 0;
 
         logger_write_queue_t *wrq = fuse_queue[0].wrq;
-        int rv = _logger_write_line(q->options, true, &wrq->lines[wrq->rd_idx]);
+        int rv = _logger_write_line(q->options, true, wrq, &wrq->lines[wrq->rd_idx]);
         if (rv < 0) {
             fprintf(stderr, "RDR: logger_write_line(): %m\n");
             break;
