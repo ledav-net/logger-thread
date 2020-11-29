@@ -30,6 +30,20 @@
 #include "logger-colors.h"
 #include "logger-thread.h"
 
+static const char * const _logger_level_label[LOGGER_LEVEL_COUNT] = {
+    [LOGGER_LEVEL_EMERG]    = "EMERG",
+    [LOGGER_LEVEL_ALERT]    = "ALERT",
+    [LOGGER_LEVEL_CRITICAL] = "CRIT ",
+    [LOGGER_LEVEL_ERROR]    = "ERROR",
+    [LOGGER_LEVEL_WARNING]  = "WARN ",
+    [LOGGER_LEVEL_NOTICE]   = "NOTCE",
+    [LOGGER_LEVEL_INFO]     = "INFO ",
+    [LOGGER_LEVEL_DEBUG]    = "DEBUG",
+    [LOGGER_LEVEL_OKAY]     = "OKAY ",
+    [LOGGER_LEVEL_TRACE]    = "TRACE",
+    [LOGGER_LEVEL_OOPS]     = "OOPS!",
+};
+
 typedef struct {
     unsigned long         ts;  /* Key to sort on (ts of current line) */
     logger_write_queue_t *wrq; /* Related write queue */
@@ -100,7 +114,7 @@ static int _logger_write_line(logger_opts_t options, bool colored, const logger_
             _logger_get_date(l->ts.tv_sec, &c),
             _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
-            c.level, logger_level_label[l->level], c.reset,
+            c.level, _logger_level_label[l->level], c.reset,
             b, wrq->thread, l->str);
     /* Print */
     return write(1, linestr, len);
