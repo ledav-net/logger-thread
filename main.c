@@ -57,7 +57,9 @@ static void *thread_func_write(const _thread_params *thp)
         struct timespec before, after;
         clock_gettime(CLOCK_MONOTONIC, &before);
 
-        if ( LOG_NOTICE("W%02d %lu => %d", th, seq, index) < 0 ) {
+        int level = rand() % LOGGER_LEVEL_COUNT;
+
+        if ( LOG_LEVEL(level, "W%02d %lu => %d", th, seq, index) < 0 ) {
             fprintf(stderr, "W%02d! %lu => %d **LOST** (%m)\n", th, seq, index);
         }
         clock_gettime(CLOCK_MONOTONIC, &after);

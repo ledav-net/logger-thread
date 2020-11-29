@@ -108,6 +108,8 @@ int			logger_printf(logger_t *logger,			/* Print a message */
 
 extern logger_t *	stdlogger; /* Default logger context to use when using the below LOG_* macros */
 
+extern const char *	logger_level_label[LOGGER_LEVEL_COUNT];
+
 #define logger_std_init			stdlogger = logger_init
 #define logger_std_deinit()		logger_deinit(stdlogger)
 #define logger_std_get_write_queue()	logger_get_write_queue(stdlogger)
@@ -122,6 +124,12 @@ extern logger_t *	stdlogger; /* Default logger context to use when using the bel
 #define LOGGER_LEVEL_TRUNCATE	LOGGER_LEVEL_INFO	/* Higher levels than INFO are not handled */
 
 #ifndef LOGGER_DISABLED
+#define LOG_LEVEL(lvl, fmt, ...) logger_std_printf( \
+    (lvl), \
+    __FILE__, \
+    __FUNCTION__, \
+    __LINE__, \
+    fmt, ## __VA_ARGS__)
 #define LOG_EMERGENCY(fmt, ...)	logger_std_printf( \
     LOGGER_LEVEL_EMERGENCY, \
     __FILE__, \
@@ -189,6 +197,7 @@ extern logger_t *	stdlogger; /* Default logger context to use when using the bel
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #else
+#define LOG_LEVEL
 #define LOG_EMERGENCY
 #define LOG_ALERT
 #define LOG_CRITICAL
