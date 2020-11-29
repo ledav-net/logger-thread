@@ -31,7 +31,7 @@
 #include <time.h>
 
 #include "logger.h"
-#include "colors.h"
+#include "logger-colors.h"
 
 #define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
 #define STON(v) ((v)*1000000000) /*  Sec -> nSec */
@@ -62,43 +62,6 @@ const char * const logger_level_label[LOGGER_LEVEL_COUNT] = {
     [LOGGER_LEVEL_OKAY]     = "OKAY ",
     [LOGGER_LEVEL_TRACE]    = "TRACE",
     [LOGGER_LEVEL_OOPS]     = "OOPS!",
-};
-
-const char * const _logger_level_color[LOGGER_LEVEL_COUNT] = {
-    [LOGGER_LEVEL_EMERG]    = C_LR,
-    [LOGGER_LEVEL_ALERT]    = C_LR,
-    [LOGGER_LEVEL_CRITICAL] = C_LR,
-    [LOGGER_LEVEL_ERROR]    = C_DR,
-    [LOGGER_LEVEL_WARNING]  = C_DY,
-    [LOGGER_LEVEL_NOTICE]   = C_DW,
-    [LOGGER_LEVEL_INFO]     = C_DB,
-    [LOGGER_LEVEL_DEBUG]    = C_DM,
-    [LOGGER_LEVEL_OKAY]     = C_DG,
-    [LOGGER_LEVEL_TRACE]    = C_DC,
-    [LOGGER_LEVEL_OOPS]     = C_LW,
-};
-
-typedef struct {
-    const char *reset;
-    const char *level;
-    const char *time;
-    const char *date;
-    const char *date_lines;
-} _logger_line_colors_t;
-
-const _logger_line_colors_t _logger_line_colors = {
-    .reset      = C_RST,
-    .time       = C_RST,
-    .date       = C_DG,
-    .date_lines = C_LG,
-};
-
-const _logger_line_colors_t _logger_line_no_colors = {
-    .reset = "",
-    .level = "",
-    .time  = "",
-    .date  = "",
-    .date_lines = "",
 };
 
 logger_t *stdlogger = NULL;
@@ -174,7 +137,7 @@ static int _logger_write_line(logger_opts_t options, bool colored, logger_line_t
     int sec            = l->ts.tv_sec % 60;
     /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
-            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s> %s\n",
+            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s>  %s\n",
             _logger_get_date(l->ts.tv_sec, &c),
             _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
