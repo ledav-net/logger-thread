@@ -78,14 +78,38 @@ static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timesp
     return syscall(SYS_futex, uaddr, futex_op, val, tv);
 }
 
+static const char *_logger_get_date(unsigned long sec)
+{
+    static char date[32];
+    static unsigned long prev_sec = 0;
+
+    if (sec - prev_sec >= 60*60*24) {
+        struct tm tm;
+        localtime_r(&sec, &tm);
+        strftime(date, sizeof(date), "-- %Y-%m-%d --\n", &tm);
+        prev_sec = sec;
+        return date;
+    }
+    return "";
+}
+
+static const char *_logger_get_time(unsigned long sec)
+{
+    static char time[8];
+    static unsigned long prev_sec = 0;
+
+    if (sec - prev_sec >= 60) {
+        struct tm tm;
+        localtime_r(&sec, &tm);
+        strftime(time, sizeof(time), "%H:%M", &tm);
+        prev_sec = sec;
+    }
+    return time;
+}
+
 static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 {
     char linestr[LOGGER_LINE_SZ+256];
-
-    struct tm tm;
-    char ts_str[32];
-    localtime_r(&l->ts.tv_sec, &tm);
-    strftime(ts_str, sizeof(ts_str), "%Y-%m-%d %T", &tm);
 
     char src_str[128], *b = src_str;
     int len = snprintf(src_str, sizeof(src_str), "%s:%s:%d", l->file, l->func, l->line);
@@ -95,8 +119,15 @@ static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 
     unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
     unsigned long msec = NTOM(l->ts.tv_nsec) % 1000;
-    len = snprintf(linestr, sizeof(linestr), "%s.%03lu,%03lu [%s] %40s> %s\n"
-                    , ts_str, msec, usec, logger_level_label[l->level], b, l->str);
+    int sec            = l->ts.tv_sec % 60;
+
+    len = snprintf(linestr, sizeof(linestr),
+            "%s%s:%02d.%03lu,%03lu [%s] %40s> %s\n",
+            _logger_get_date(l->ts.tv_sec),
+            _logger_get_time(l->ts.tv_sec),
+            sec, msec, usec,
+            logger_level_label[l->level],
+            b, l->str);
 
     return write(1, linestr, len);
 }
