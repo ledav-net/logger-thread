@@ -60,12 +60,12 @@ const char *logger_level_label[LOGGER_LEVEL_COUNT] = {
 
 logger_t *stdlogger = NULL;
 
+// Uncomment to strip all the debug lines for this source.
+//#define fprintf
+
 #define futex_wait(addr, val)		_futex((addr), FUTEX_WAIT_PRIVATE, (val), NULL)
 #define futex_timed_wait(addr, val, ts)	_futex((addr), FUTEX_WAIT_PRIVATE, (val), (ts))
 #define futex_wake(addr, val)		_futex((addr), FUTEX_WAKE_PRIVATE, (val), NULL)
-
-// Uncomment to strip all the debug lines for this source.
-//#define fprintf
 
 static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
 {
@@ -86,8 +86,8 @@ static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 static inline void _bubble_fuse_up(_logger_fuse_entry_t *fuse, int fuse_nr)
 {
     if (fuse_nr > 1 && fuse[0].ts > fuse[1].ts) {
-        register int i=0;
-        _logger_fuse_entry_t newentry = fuse[0]; // Strickly bigger move up (stack empty ones at the end)
+        register int i = 0;
+        _logger_fuse_entry_t newentry = fuse[0]; // Strictly bigger move up (stack empty ones at the end of smallers)
         do { fuse[i] = fuse[i+1]; i++; } while (i < fuse_nr-1 && newentry.ts > fuse[i+1].ts);
         fuse[i] = newentry;
     }
@@ -96,7 +96,7 @@ static inline void _bubble_fuse_up(_logger_fuse_entry_t *fuse, int fuse_nr)
 static inline void _bubble_fuse_down(_logger_fuse_entry_t *fuse, int fuse_nr)
 {
     if (fuse_nr > 1 && fuse[fuse_nr-1].ts <= fuse[fuse_nr-2].ts) {
-        register int i=fuse_nr-1;
+        register int i = fuse_nr-1;
         _logger_fuse_entry_t newentry = fuse[i]; // Smaller & same move down (so, stack empty ones at top of smallers)
         do { fuse[i] = fuse[i-1]; i--; } while (i > 0 && newentry.ts <= fuse[i-1].ts);
         fuse[i] = newentry;
@@ -137,7 +137,7 @@ static int _logger_enqueue_next_lines(_logger_fuse_entry_t *fuse, int fuse_nr, i
     if (fuse[0].ts != ~0) { // This one should have been processed. Freeing it ...
         wrq = fuse[0].wrq;
 
-        wrq->lines[wrq->rd_idx].ready = false; // Free this line for the logger thread
+        wrq->lines[wrq->rd_idx].ready = false; // Free this line for the writer thread
         wrq->rd_idx = ++wrq->rd_seq % wrq->lines_nr;
         empty_nr += _logger_set_queue_entry(wrq, &fuse[0]); // Enqueue the next line
 
@@ -208,7 +208,7 @@ logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, log
     logger_t *q;
 
     if (!write_queues_max) {
-        return errno = EINVAL, NULL; // No readers, nothing to do ...
+        return errno = EINVAL, NULL; // No writers, nothing to do ...
     }
     q = calloc(1, sizeof(logger_t));
     q->queues = calloc(write_queues_max, sizeof(logger_write_queue_t *));
