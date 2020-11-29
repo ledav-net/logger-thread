@@ -108,7 +108,7 @@ int			logger_printf(logger_t *logger,			/* Print a message */
 
 extern logger_t *	stdlogger; /* Default logger context to use when using the below LOG_* macros */
 
-extern const char *	logger_level_label[LOGGER_LEVEL_COUNT];
+extern const char * const logger_level_label[LOGGER_LEVEL_COUNT];
 
 #define logger_std_init			stdlogger = logger_init
 #define logger_std_deinit()		logger_deinit(stdlogger)

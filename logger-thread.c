@@ -31,6 +31,7 @@
 #include <time.h>
 
 #include "logger.h"
+#include "colors.h"
 
 #define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
 #define STON(v) ((v)*1000000000) /*  Sec -> nSec */
@@ -49,18 +50,55 @@ typedef struct {
     logger_write_queue_t *wrq; /* Related write queue */
 } _logger_fuse_entry_t;
 
-const char *logger_level_label[LOGGER_LEVEL_COUNT] = {
-    [LOGGER_LEVEL_EMERG]    = "EMERG ",
-    [LOGGER_LEVEL_ALERT]    = "ALERT ",
-    [LOGGER_LEVEL_CRITICAL] = "CRITIC",
-    [LOGGER_LEVEL_ERROR]    = "ERROR ",
-    [LOGGER_LEVEL_WARNING]  = "WARN  ",
-    [LOGGER_LEVEL_NOTICE]   = "NOTICE",
-    [LOGGER_LEVEL_INFO]     = "INFO  ",
-    [LOGGER_LEVEL_DEBUG]    = "DEBUG ",
-    [LOGGER_LEVEL_OKAY]     = "OKAY  ",
-    [LOGGER_LEVEL_TRACE]    = "TRACE ",
-    [LOGGER_LEVEL_OOPS]     = "OOPS  ",
+const char * const logger_level_label[LOGGER_LEVEL_COUNT] = {
+    [LOGGER_LEVEL_EMERG]    = "EMERG",
+    [LOGGER_LEVEL_ALERT]    = "ALERT",
+    [LOGGER_LEVEL_CRITICAL] = "CRIT ",
+    [LOGGER_LEVEL_ERROR]    = "ERROR",
+    [LOGGER_LEVEL_WARNING]  = "WARN ",
+    [LOGGER_LEVEL_NOTICE]   = "NOTCE",
+    [LOGGER_LEVEL_INFO]     = "INFO ",
+    [LOGGER_LEVEL_DEBUG]    = "DEBUG",
+    [LOGGER_LEVEL_OKAY]     = "OKAY ",
+    [LOGGER_LEVEL_TRACE]    = "TRACE",
+    [LOGGER_LEVEL_OOPS]     = "OOPS!",
+};
+
+const char * const _logger_level_color[LOGGER_LEVEL_COUNT] = {
+    [LOGGER_LEVEL_EMERG]    = C_LR,
+    [LOGGER_LEVEL_ALERT]    = C_LR,
+    [LOGGER_LEVEL_CRITICAL] = C_LR,
+    [LOGGER_LEVEL_ERROR]    = C_DR,
+    [LOGGER_LEVEL_WARNING]  = C_DY,
+    [LOGGER_LEVEL_NOTICE]   = C_DW,
+    [LOGGER_LEVEL_INFO]     = C_DB,
+    [LOGGER_LEVEL_DEBUG]    = C_DM,
+    [LOGGER_LEVEL_OKAY]     = C_DG,
+    [LOGGER_LEVEL_TRACE]    = C_DC,
+    [LOGGER_LEVEL_OOPS]     = C_LW,
+};
+
+typedef struct {
+    const char *reset;
+    const char *level;
+    const char *time;
+    const char *date;
+    const char *date_lines;
+} _logger_line_colors_t;
+
+const _logger_line_colors_t _logger_line_colors = {
+    .reset      = C_RST,
+    .time       = C_RST,
+    .date       = C_DG,
+    .date_lines = C_LG,
+};
+
+const _logger_line_colors_t _logger_line_no_colors = {
+    .reset = "",
+    .level = "",
+    .time  = "",
+    .date  = "",
+    .date_lines = "",
 };
 
 logger_t *stdlogger = NULL;
@@ -78,57 +116,71 @@ static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timesp
     return syscall(SYS_futex, uaddr, futex_op, val, tv);
 }
 
-static const char *_logger_get_date(unsigned long sec)
+static const char *_logger_get_date(unsigned long sec, _logger_line_colors_t *c)
 {
-    static char date[32];
+    static char date[64];
     static unsigned long prev_sec = 0;
 
     if (sec - prev_sec >= 60*60*24) {
+        char tmp[16];
         struct tm tm;
         localtime_r(&sec, &tm);
-        strftime(date, sizeof(date), "-- %Y-%m-%d --\n", &tm);
+        strftime(tmp, sizeof(tmp), "%Y-%m-%d", &tm);
+        sprintf(date, "%s-- %s%s%s --%s\n",
+                    c->date_lines, c->date, tmp, c->date_lines, c->reset);
         prev_sec = sec;
         return date;
     }
     return "";
 }
 
-static const char *_logger_get_time(unsigned long sec)
+static const char *_logger_get_time(unsigned long sec, _logger_line_colors_t *c)
 {
-    static char time[8];
+    static char time[32];
     static unsigned long prev_sec = 0;
 
     if (sec - prev_sec >= 60) {
+        char tmp[8];
         struct tm tm;
         localtime_r(&sec, &tm);
-        strftime(time, sizeof(time), "%H:%M", &tm);
+        strftime(tmp, sizeof(tmp), "%H:%M", &tm);
+        sprintf(time, "%s%s%s", c->time, tmp, c->reset);
         prev_sec = sec;
     }
     return time;
 }
 
-static int _logger_write_line(logger_opts_t options, logger_line_t *l)
+static int _logger_write_line(logger_opts_t options, bool colored, logger_line_t *l)
 {
     char linestr[LOGGER_LINE_SZ+256];
+    _logger_line_colors_t c;
 
+    /* Color scheme to use if needed */
+    if ( colored ) {
+        c = _logger_line_colors;
+        c.level = _logger_level_color[l->level];
+    } else {
+        c = _logger_line_no_colors;
+    }
+    /* File/Function/Line */
     char src_str[128], *b = src_str;
     int len = snprintf(src_str, sizeof(src_str), "%s:%s:%d", l->file, l->func, l->line);
-    if ( len > 40 ) {
-        b += len - 40;
+    if ( len > 35 ) {
+        b += len - 35;
     }
-
+    /* Time stamp calculations */
     unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
     unsigned long msec = NTOM(l->ts.tv_nsec) % 1000;
     int sec            = l->ts.tv_sec % 60;
-
+    /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
-            "%s%s:%02d.%03lu,%03lu [%s] %40s> %s\n",
-            _logger_get_date(l->ts.tv_sec),
-            _logger_get_time(l->ts.tv_sec),
+            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s> %s\n",
+            _logger_get_date(l->ts.tv_sec, &c),
+            _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
-            logger_level_label[l->level],
+            c.level, logger_level_label[l->level], c.reset,
             b, l->str);
-
+    /* Print */
     return write(1, linestr, len);
 }
 
@@ -242,7 +294,7 @@ static void *_thread_logger(logger_t *q)
         really_empty = 0;
 
         logger_write_queue_t *wrq = fuse_queue[0].wrq;
-        int rv = _logger_write_line(q->options, &wrq->lines[wrq->rd_idx]);
+        int rv = _logger_write_line(q->options, true, &wrq->lines[wrq->rd_idx]);
         if (rv < 0) {
             fprintf(stderr, "RDR: logger_write_line(): %m\n");
             break;
