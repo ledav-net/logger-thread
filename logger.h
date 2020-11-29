@@ -21,7 +21,7 @@
 #include <stdatomic.h>
 #include <time.h>
 
-#define LOGGER_LINE_SZ		64			/* Maximum size per log msg (\0 included) */
+#define LOGGER_LINE_SZ		2048			/* Maximum size per log msg (\0 included) */
 
 typedef enum {
     LOGGER_LEVEL_FIRST		= 0,			/* First level value */

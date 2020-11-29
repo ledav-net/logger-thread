@@ -18,6 +18,7 @@
 
 #include <linux/futex.h>
 #include <sys/syscall.h>
+#include <sys/time.h>
 #include <stdatomic.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -33,8 +34,12 @@
 
 #define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
 #define STON(v) ((v)*1000000000) /*  Sec -> nSec */
+
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
+
+#define NTOM(v) ((v)/1000000)    /* nSec -> mSec */
+#define NTOU(v) ((v)/1000)       /* nSec -> XSec */
 
 #define timespec_to_ns(a) ((STON((a).tv_sec) + (a).tv_nsec))
 #define elapsed_ns(b,a) (timespec_to_ns(a) - timespec_to_ns(b))
@@ -75,12 +80,25 @@ static inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timesp
 
 static int _logger_write_line(logger_opts_t options, logger_line_t *l)
 {
-    char buf[LOGGER_LINE_SZ+16];
-    unsigned long ts = STON(l->ts.tv_sec) + l->ts.tv_nsec;
-    int len = sprintf(buf, "LOG> %lu [%d] %s:%s:%d> %s\n"
-                     , ts, l->level, l->file, l->func, l->line, l->str);
-    write(1, buf, len);
-    return 0;
+    char linestr[LOGGER_LINE_SZ+256];
+
+    struct tm tm;
+    char ts_str[32];
+    localtime_r(&l->ts.tv_sec, &tm);
+    strftime(ts_str, sizeof(ts_str), "%Y-%m-%d %T", &tm);
+
+    char src_str[128], *b = src_str;
+    int len = snprintf(src_str, sizeof(src_str), "%s:%s:%d", l->file, l->func, l->line);
+    if ( len > 40 ) {
+        b += len - 40;
+    }
+
+    unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
+    unsigned long msec = NTOM(l->ts.tv_nsec) % 1000;
+    len = snprintf(linestr, sizeof(linestr), "%s.%03lu,%03lu [%s] %40s> %s\n"
+                    , ts_str, msec, usec, logger_level_label[l->level], b, l->str);
+
+    return write(1, linestr, len);
 }
 
 static inline void _bubble_fuse_up(_logger_fuse_entry_t *fuse, int fuse_nr)
@@ -185,7 +203,7 @@ static void *_thread_logger(logger_t *q)
             atomic_store(&q->waiting, 1);
             if (futex_wait(&q->waiting, 1) < 0 && errno != EAGAIN) {
                 fprintf(stderr, "RDR! ERROR: %m !\n");
-                return NULL;
+                break;
             }
             continue;
         }
@@ -196,7 +214,7 @@ static void *_thread_logger(logger_t *q)
         int rv = _logger_write_line(q->options, &wrq->lines[wrq->rd_idx]);
         if (rv < 0) {
             fprintf(stderr, "RDR: logger_write_line(): %m\n");
-            return NULL;
+            break;
         }
     }
     fprintf(stderr, "RDR! Exit\n");
@@ -310,7 +328,7 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
     }
     va_start(ap, format);
 
-    clock_gettime(CLOCK_MONOTONIC, &l->ts);
+    clock_gettime(CLOCK_REALTIME, &l->ts);
     l->level = level;
     l->file = src;
     l->func = func;
