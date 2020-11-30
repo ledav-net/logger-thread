@@ -35,9 +35,6 @@
 #define NTOM(v) ((v)/1000000)    /* nSec -> mSec */
 #define NTOU(v) ((v)/1000)       /* nSec -> XSec */
 
-#define timespec_to_ns(a) ((STON((a).tv_sec) + (a).tv_nsec))
-#define elapsed_ns(b,a) (timespec_to_ns(a) - timespec_to_ns(b))
-
 #define futex_wait(addr, val)		_futex((addr), FUTEX_WAIT_PRIVATE, (val), NULL)
 #define futex_timed_wait(addr, val, ts)	_futex((addr), FUTEX_WAIT_PRIVATE, (val), (ts))
 #define futex_wake(addr, val)		_futex((addr), FUTEX_WAKE_PRIVATE, (val), NULL)

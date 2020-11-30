@@ -29,9 +29,6 @@
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
-#define timespec_to_ns(a) ((STON((a).tv_sec) + (a).tv_nsec))
-#define elapsed_ns(b,a) (timespec_to_ns(a) - timespec_to_ns(b))
-
 // Uncomment to strip all the debug lines for this source.
 //#define fprintf
 
