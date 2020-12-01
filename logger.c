@@ -110,6 +110,8 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
         const char *format, ...)
 {
     va_list ap;
+    int th, index;
+    logger_line_t *l;
 
     if (logger->terminate) {
         fprintf(stderr, "Queue is closed !\n");
@@ -118,9 +120,11 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
     if (!wrq) {
         wrq = logger_get_write_queue(logger);
     }
-    int index = wrq->wr_seq % wrq->lines_nr;
-    int th = wrq->queue_idx;
-    logger_line_t *l = &wrq->lines[index];
+    th = wrq->queue_idx;
+
+reindex:
+    index = wrq->wr_seq % wrq->lines_nr;
+    l = &wrq->lines[index];
 
     while (l->ready) {
         fprintf(stderr, "W%02d! Queue full ...\n", th);
@@ -135,10 +139,22 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
             continue;
         }
         if (logger->options & LOGGER_OPT_NONBLOCK) {
-            fprintf(stderr, "W%02d! Line dropped (%d so far) !\n", th, ++wrq->lost);
+            wrq->lost++;
+            fprintf(stderr, "W%02d! Line dropped (%d %s) !\n", th, wrq->lost,
+                    logger->options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
         usleep(50);
+    }
+    if (wrq->lost && logger->options & LOGGER_OPT_PRINTLOST) {
+        int lost = wrq->lost;
+        wrq->lost_total += wrq->lost;
+        wrq->lost = 0;
+
+        logger_printf(logger, wrq, LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__,
+            "Lost %d log line(s) (%d so far) !", lost, wrq->lost_total);
+
+        goto reindex;
     }
     va_start(ap, format);
 

@@ -64,7 +64,7 @@ static void *thread_func_write(const _thread_params *thp)
         fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
                         th, timespec_to_ns(after), elapsed_ns(before, after), index);
     }
-    fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost);
+    fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost_total);
     return NULL;
 }
 
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
                     , thread_max, lines_max, thp.output_max, thp.luck, thp.uwait);
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
-    logger_std_init(thread_max, lines_max /* default buffer size */, LOGGER_OPT_NONBLOCK);
+    logger_std_init(thread_max, lines_max, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
     sleep(start_wait);
 
     /* Writer threads */

@@ -46,10 +46,9 @@ typedef enum {
 } logger_line_level_t;
 
 typedef enum {
-    LOGGER_OPT_NONE	= 0,	/* No options. Use default values ! */
-    LOGGER_OPT_PID	= 1,	/* Add the pid of the actual process on each lines. */
-    LOGGER_OPT_NONBLOCK	= 2,	/* return -1 and EAGAIN when the queue is full */
-    LOGGER_OPT_SYNC	= 4,	/* Return from printlog when message is really saved. */
+    LOGGER_OPT_NONE      = 0,	/* No options. Use default values ! */
+    LOGGER_OPT_NONBLOCK  = 1,	/* return -1 and EAGAIN when the queue is full */
+    LOGGER_OPT_PRINTLOST = 2,	/* Print lost lines soon as there is some free space again */
 } logger_opts_t;
 
 /* Definition of a log line */
@@ -67,16 +66,17 @@ struct logger_t;
 
 /* Write queue: 1 per thread */
 typedef struct {
-    logger_line_t	*lines;    /* Lines buffer */
-    int			lines_nr;  /* Maximum number of buffered lines for this thread */
-    int			queue_idx; /* This queue index */
-    atomic_int		waiting;   /* True (1) if the thread is waiting for free space ... */
-    unsigned int	rd_idx;    /* Read index */
-    unsigned long	rd_seq;    /* Read sequence */
-    unsigned long	wr_seq;    /* Write sequence */
-    long		lost;	   /* Number of lost records */
-    struct logger_t	*logger;   /* Logger queue this write queue belongs to */
-    pthread_t		thread;    /* Write thread owning this queue */
+    logger_line_t	*lines;     /* Lines buffer */
+    int			lines_nr;   /* Maximum number of buffered lines for this thread */
+    int			queue_idx;  /* This queue index */
+    atomic_int		waiting;    /* True (1) if the thread is waiting for free space ... */
+    unsigned int	rd_idx;     /* Read index */
+    unsigned long	rd_seq;     /* Read sequence */
+    unsigned long	wr_seq;     /* Write sequence */
+    unsigned long	lost_total; /* Total number of lost records so far */
+    unsigned long	lost;	    /* Number of lost records since last printed */
+    struct logger_t	*logger;    /* Logger queue this write queue belongs to */
+    pthread_t		thread;     /* Write thread owning this queue */
 } logger_write_queue_t;
 
 typedef struct logger_t {
