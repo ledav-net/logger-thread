@@ -231,10 +231,10 @@ void *_thread_logger(logger_t *q)
                     break; // while (2)
                 }
                 if (really_empty < 5) {
-                    fprintf(stderr, "RDR! Print queue empty. Double check in 0.2 ms ...\n");
-                    really_empty++;
-                    usleep(200);
-                    /* Double-check (5 times) if the queue is really empty in 0.2 ms */
+                    int wait = 32 << really_empty++;
+                    fprintf(stderr, "RDR! Print queue empty. Double check in %d us ...\n", wait);
+                    usleep(wait);
+                    /* Double-check (5 times) if the queue is really empty for ~1ms */
                     /* This avoid the writers to wakeup too frequently the reader in case of burst */
                     continue;
                 }
