@@ -154,19 +154,6 @@ static inline int _logger_set_queue_entry(const logger_write_queue_t *wrq, _logg
     return 0;
 }
 
-static inline int _logger_init_lines_queue(const logger_t *q, _logger_fuse_entry_t *fuse, int fuse_nr)
-{
-    memset(fuse, 0, fuse_nr * sizeof(_logger_fuse_entry_t));
-
-    for (int i=0 ; i<fuse_nr; i++) {
-        logger_write_queue_t *wrq = q->queues[i];
-
-        fuse[i].ts  = ~0; // Init all the queues as if they were empty
-        fuse[i].wrq = wrq;
-    }
-    return fuse_nr; // Number of empty queues (all)
-}
-
 static int _logger_enqueue_next_lines(_logger_fuse_entry_t *fuse, int fuse_nr, int empty_nr)
 {
     logger_write_queue_t *wrq;
@@ -187,6 +174,19 @@ static int _logger_enqueue_next_lines(_logger_fuse_entry_t *fuse, int fuse_nr, i
         _bubble_fuse_down(fuse, fuse_nr);
     }
     return rv; // return the number of remaining empty queues ...
+}
+
+static inline int _logger_init_lines_queue(const logger_t *q, _logger_fuse_entry_t *fuse, int fuse_nr)
+{
+    memset(fuse, 0, fuse_nr * sizeof(_logger_fuse_entry_t));
+
+    for (int i=0 ; i<fuse_nr; i++) {
+        logger_write_queue_t *wrq = q->queues[i];
+
+        fuse[i].ts  = ~0; // Init all the queues as if they were empty
+        fuse[i].wrq = wrq;
+    }
+    return fuse_nr; // Number of empty queues (all)
 }
 
 void *_thread_logger(logger_t *q)
