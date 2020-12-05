@@ -93,8 +93,15 @@ void logger_deinit(logger_t *_q)
         fprintf(stderr, "Joining logger ...\n");
         pthread_join(q->reader_thread, NULL);
     }
+    int total = 0;
+    for (int i = 0; i < q->queues_nr; i++) {
+        total += sizeof(logger_write_queue_t) + q->queues[i]->lines_nr * sizeof(logger_line_t);
+    }
+    fprintf(stderr, "total memory allocated for the queues = %d kb\n", total/1024);
+
     for (int i=0 ; i<q->queues_nr; i++) {
         free(q->queues[i]->lines);
+        free(q->queues[i]);
     }
     free(q->queues);
     free(q);
