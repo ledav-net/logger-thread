@@ -214,8 +214,8 @@ void *_thread_logger(logger_t *q)
         }
         _logger_fuse_entry_t fuse_queue[fuse_nr];
 
-        fprintf(stderr, "RDR! (re)loading... _logger_fuse_entry_t = %d bytes (%d bytes total)\n",
-                        sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
+        fprintf(stderr, "RDR! (re)loading... _logger_fuse_entry_t = %d x %d bytes (%d bytes total)\n",
+                        fuse_nr, sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
 
         empty_nr = _logger_init_lines_queue(q, fuse_queue, fuse_nr);
 
