@@ -68,35 +68,47 @@ struct logger_t;
 typedef struct {
     logger_line_t	*lines;     /* Lines buffer */
     int			lines_nr;   /* Maximum number of buffered lines for this thread */
-    int			queue_idx;  /* This queue index */
     atomic_int		waiting;    /* True (1) if the thread is waiting for free space ... */
     unsigned int	rd_idx;     /* Read index */
     unsigned long	rd_seq;     /* Read sequence */
     unsigned long	wr_seq;     /* Write sequence */
     unsigned long	lost_total; /* Total number of lost records so far */
     unsigned long	lost;	    /* Number of lost records since last printed */
+    bool		free;       /* True if this queue is not used */
     struct logger_t	*logger;    /* Logger queue this write queue belongs to */
     pthread_t		thread;     /* Write thread owning this queue */
+    int			thread_idx;
 } logger_write_queue_t;
 
 typedef struct logger_t {
-    logger_write_queue_t **queues;	/* Write queues, 1 per thread */
-    int			 queues_nr;	/* Number of queues */
-    logger_opts_t	 options;	/* Queue options */
-    bool		 terminate;     /* Set to true when the reader thread has to finish */
-    pthread_t		 reader_thread; /* TID of the reader thread */
-    bool		 empty;		/* Set to true when all the queues are empty */
-    atomic_int		 waiting;	/* Futex to old the number of waiting loggers (0 or 1) */
+    logger_write_queue_t **queues;		/* Write queues, 1 per thread */
+    int			 queues_nr;		/* Number of queues */
+    int			 queues_max;		/* Maximum number of possible queues */
+    int			 default_lines_nr;	/* Default number of lines max / buffer to use */
+    bool		 terminate;		/* Set to true when the reader thread has to finish */
+    bool		 empty;			/* Set to true when all the queues are empty */
+    logger_opts_t	 options;		/* Queue options */
+    atomic_int		 reload;		/* Take new queue(s) into account */
+    atomic_int		 waiting;		/* Futex to old the number of waiting loggers (0 or 1) */
+    pthread_t		 reader_thread;		/* TID of the reader thread */
+    pthread_mutex_t	 queues_lk;		/* Needed when extending the **queues array... */
 } logger_t;
 
 logger_t *		logger_init(			/* Initialize the logger manager */
-                            unsigned int queues_max,	/* Number of writer threads. If 0 => Print log lines directly */
-                            unsigned int lines_max,	/* Maximum number of log lines to buffer */
+                            unsigned int lines_def,	/* Recommanded log lines to allocate by default */
                             logger_opts_t options);	/* See options above. */
 
 void			logger_deinit(logger_t *logger); /* Empty the queues and free all the ressources */
 
-logger_write_queue_t *	logger_get_write_queue(logger_t *logger);
+logger_write_queue_t *	logger_get_write_queue(logger_t *logger, /* Get a free write queue to work with */
+                            int lines_max);			 /* Max lines buffer (<=0 use default) */
+
+int			logger_free_write_queue(logger_t *logger,  /* Release the write queue for another thread */
+                            logger_write_queue_t *wrq);		 /* Write queue to free (NULL = find it yourself) */
+
+logger_write_queue_t *	logger_alloc_write_queue(logger_t *logger,	/* Allocate a new write queue */
+                            pthread_t thread,				/* Thread associated with this queue */
+                            int lines_max);				/* Lines max */
 
 int			logger_printf(logger_t *logger,			/* Print a message */
                             logger_write_queue_t *wrq,			/* Write queue to print to */
@@ -108,9 +120,10 @@ int			logger_printf(logger_t *logger,			/* Print a message */
 
 extern logger_t *	stdlogger; /* Default logger context to use when using the below LOG_* macros */
 
-#define logger_std_init			stdlogger = logger_init
-#define logger_std_deinit()		logger_deinit(stdlogger)
-#define logger_std_get_write_queue()	logger_get_write_queue(stdlogger)
+#define logger_std_init(m,o)		(stdlogger = logger_init((m), (o)))
+#define logger_std_deinit		logger_deinit(stdlogger)
+#define logger_std_get_write_queue(sz)	logger_get_write_queue(stdlogger, (sz))
+#define logger_std_free_write_queue(q)	logger_free_write_queue(stdlogger, (q))
 #define logger_std_printf(fmt, ...)	logger_printf(stdlogger, NULL, fmt, ## __VA_ARGS__)
 
 #define timespec_to_ns(a)	((STON((a).tv_sec) + (a).tv_nsec))

@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <limits.h>
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
@@ -35,32 +36,43 @@
 
 logger_t *stdlogger = NULL;
 
-logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, logger_opts_t options)
+logger_write_queue_t *logger_alloc_write_queue(logger_t *q, pthread_t thread, int lines_max)
+{
+    if (q->queues_nr == q->queues_max) {
+        return errno = ENOBUFS, NULL;
+    }
+    logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
+    wrq->lines = calloc(lines_max, sizeof(logger_line_t));
+    wrq->lines_nr = lines_max;
+    wrq->thread = thread;
+    wrq->logger = q;
+
+    fprintf(stderr, "logger_line_t = %d bytes (%d kb allocated)\n",
+                    sizeof(logger_line_t), sizeof(logger_line_t) * lines_max / 1024);
+
+    /* Ensure this is done atomically between writers. Reader is safe. */
+    pthread_mutex_lock(&q->queues_lk);
+    q->queues[q->queues_nr++] = wrq;
+    pthread_mutex_unlock(&q->queues_lk);
+
+    /* Let the logger thread take this change into account when he can ... */
+    atomic_compare_exchange_strong(&q->reload, &(atomic_int){ 0 }, 1);
+    return wrq;
+}
+
+logger_t *logger_init(unsigned int queues_max, logger_opts_t options)
 {
     logger_t *q;
 
-    if (!write_queues_max) {
-        return errno = EINVAL, NULL; // No writers, nothing to do ...
-    }
     q = calloc(1, sizeof(logger_t));
-    q->queues = calloc(write_queues_max, sizeof(logger_write_queue_t *));
-    q->queues_nr = write_queues_max;
+    q->queues = calloc(queues_max, sizeof(logger_write_queue_t *));
+    q->queues_max = queues_max;
     q->options = options;
 
-    for (int i=0 ; i < write_queues_max ; i++) {
-        logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
-        wrq->lines = calloc(lines_max, sizeof(logger_line_t));
-        wrq->lines_nr = lines_max;
-        wrq->queue_idx = i;
-        wrq->logger = q;
-        q->queues[i] = wrq;
-    }
     /* Reader thread */
     pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
     pthread_setname_np(q->reader_thread, "logger-reader");
 
-    fprintf(stderr, "logger_line_t = %d (%d)\n",
-                    sizeof(logger_line_t), sizeof(logger_line_t) * lines_max);
     return q;
 }
 
@@ -88,19 +100,55 @@ void logger_deinit(logger_t *_q)
     free(q);
 }
 
-logger_write_queue_t *logger_get_write_queue(logger_t *logger)
+logger_write_queue_t *logger_get_write_queue(logger_t *logger, int lines_max)
 {
     if (!logger) {
         return errno = EBADF, NULL;
     }
+    int last_lines_nr = INT_MAX;
+    logger_write_queue_t *fwrq = NULL;
     pthread_t th = pthread_self();
 
-    for (int i=0; i<stdlogger->queues_nr; i++) {
-        if (th == stdlogger->queues[i]->thread) {
-            return stdlogger->queues[i];
+    /* TODO: Find a way to keep the wrq pointer in a thread specific data space... */
+
+    if (lines_max <= 0) {
+        /* Caller don't want a specific size... */
+        lines_max = logger->default_lines_nr;
+    }
+    logger_write_queue_t **wrq = stdlogger->queues;
+    for (int i=0; i < stdlogger->queues_nr; i++) {
+        if (th == wrq[i]->thread) {
+            /* queue already allocated for this thread */
+            return wrq[i];
+        }
+        if (!wrq[i]->free) {
+            continue;
+        }
+        /* While we are at it, keep trace of the best free queue ... */
+        int lines_nr = wrq[i]->lines_nr;
+        if (lines_max <= lines_nr && lines_nr < last_lines_nr) {
+                last_lines_nr = lines_nr;
+                fwrq = wrq[i];
         }
     }
-    return errno = ECHILD, NULL;
+    if (fwrq) {
+        // TODO: Need a lock here ...
+        /* A previously allocated queue is free and usable */
+        fwrq->thread = th;
+        fwrq->free = false;
+        return fwrq;
+    }
+    /* No free queue that fits our needs... Adding a new one. */
+    return logger_alloc_write_queue(logger, th, lines_max);
+}
+
+int	logger_free_write_queue(logger_t *logger, logger_write_queue_t *wrq)
+{
+    if (!wrq) {
+        wrq = logger_get_write_queue(logger, -1);
+    }
+    wrq->free = true;
+    return 0;
 }
 
 int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level_t level,
@@ -118,9 +166,9 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
         return errno = ESHUTDOWN, -1;
     }
     if (!wrq) {
-        wrq = logger_get_write_queue(logger);
+        wrq = logger_get_write_queue(logger, -1);
     }
-    th = wrq->queue_idx;
+    th = wrq->thread_idx;
 
 reindex:
     index = wrq->wr_seq % wrq->lines_nr;
@@ -148,7 +196,7 @@ reindex:
     }
     if (wrq->lost && logger->options & LOGGER_OPT_PRINTLOST) {
         int lost = wrq->lost;
-        wrq->lost_total += wrq->lost;
+        wrq->lost_total += lost;
         wrq->lost = 0;
 
         logger_printf(logger, wrq, LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__,
