@@ -122,8 +122,8 @@ logger_write_queue_t *logger_get_write_queue(logger_t *logger, int lines_max)
         /* Caller don't want a specific size... */
         lines_max = logger->default_lines_nr;
     }
-    logger_write_queue_t **wrq = stdlogger->queues;
-    for (int i=0; i < stdlogger->queues_nr; i++) {
+    logger_write_queue_t **wrq = logger->queues;
+    for (int i=0; i < logger->queues_nr; i++) {
         if (th == wrq[i]->thread) {
             /* queue already allocated for this thread */
             return wrq[i];
