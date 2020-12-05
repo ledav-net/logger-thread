@@ -47,8 +47,8 @@ logger_write_queue_t *logger_alloc_write_queue(logger_t *q, pthread_t thread, in
     wrq->thread = thread;
     wrq->logger = q;
 
-    fprintf(stderr, "logger_line_t = %d bytes (%d kb allocated)\n",
-                    sizeof(logger_line_t), sizeof(logger_line_t) * lines_max / 1024);
+    fprintf(stderr, "logger_line_t = %d x %d bytes (%d kb allocated)\n",
+                    lines_max, sizeof(logger_line_t), sizeof(logger_line_t) * lines_max / 1024);
 
     /* Ensure this is done atomically between writers. Reader is safe. */
     pthread_mutex_lock(&q->queues_lk);
@@ -147,6 +147,7 @@ int	logger_free_write_queue(logger_t *logger, logger_write_queue_t *wrq)
     if (!wrq) {
         wrq = logger_get_write_queue(logger, -1);
     }
+    wrq->thread = 0;
     wrq->free = true;
     return 0;
 }
