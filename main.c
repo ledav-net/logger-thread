@@ -48,9 +48,10 @@ atomic_int thread_idx = 0;
 static void *thread_func_write(const _thread_params *thp)
 {
     logger_write_queue_t *wrq;
+    int th = atomic_fetch_add(&thread_idx, 1);
 
     wrq = logger_std_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
-    int th = wrq->thread_idx = atomic_fetch_add(&thread_idx, 1);
+    wrq->thread_idx = th;
 
     for (int seq = 0; seq < thp->print_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;

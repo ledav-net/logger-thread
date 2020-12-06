@@ -47,11 +47,12 @@ logger_write_queue_t *logger_alloc_write_queue(logger_t *q, pthread_t thread, in
     wrq->thread = thread;
     wrq->logger = q;
 
-    fprintf(stderr, "logger_line_t = %d x %d bytes (%d kb allocated)\n",
+    fprintf(stderr, "W..! logger_line_t = %d x %d bytes (%d kb allocated)\n",
                     lines_max, sizeof(logger_line_t), sizeof(logger_line_t) * lines_max / 1024);
 
     /* Ensure this is done atomically between writers. Reader is safe. */
     pthread_mutex_lock(&q->queues_lk);
+    wrq->queue_idx = q->queues_nr;
     q->queues[q->queues_nr++] = wrq;
     pthread_mutex_unlock(&q->queues_lk);
 
@@ -72,7 +73,6 @@ logger_t *logger_init(unsigned int queues_max, logger_opts_t options)
     /* Reader thread */
     pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
     pthread_setname_np(q->reader_thread, "logger-reader");
-
     return q;
 }
 
@@ -112,50 +112,58 @@ logger_write_queue_t *logger_get_write_queue(logger_t *logger, int lines_max)
     if (!logger) {
         return errno = EBADF, NULL;
     }
-    int last_lines_nr = INT_MAX;
-    logger_write_queue_t *fwrq = NULL;
-    pthread_t th = pthread_self();
+    static _Thread_local logger_write_queue_t *wrq = NULL; /* Local thread variable */
 
-    /* TODO: Find a way to keep the wrq pointer in a thread specific data space... */
-
+    if (wrq && !atomic_load(&wrq->free)) {
+        /* Return the queue actually in use by this thread */
+        fprintf(stderr, "W%02d! logger_get_write_queue(0x%p, %d) = 0x%p (%d)\n",
+                        wrq->thread_idx, logger, lines_max, wrq, wrq->queue_idx);
+        return wrq;
+    }
     if (lines_max <= 0) {
         /* Caller don't want a specific size... */
         lines_max = logger->default_lines_nr;
     }
-    logger_write_queue_t **wrq = logger->queues;
+    logger_write_queue_t **queue = logger->queues;
+    pthread_t th = pthread_self();
+    int last_lines_nr;
+retry:
+    /* Searching first for a free queue previously allocated */
+    last_lines_nr = INT_MAX;
+    wrq = NULL;
     for (int i=0; i < logger->queues_nr; i++) {
-        if (th == wrq[i]->thread) {
-            /* queue already allocated for this thread */
-            return wrq[i];
-        }
-        if (!wrq[i]->free) {
+        if (!atomic_load(&queue[i]->free)) {
             continue;
         }
-        /* While we are at it, keep trace of the best free queue ... */
-        int lines_nr = wrq[i]->lines_nr;
+        /* Find the best free queue ... */
+        int lines_nr = queue[i]->lines_nr;
         if (lines_max <= lines_nr && lines_nr < last_lines_nr) {
                 last_lines_nr = lines_nr;
-                fwrq = wrq[i];
+                wrq = queue[i];
         }
     }
-    if (fwrq) {
-        // TODO: Need a lock here ...
-        /* A previously allocated queue is free and usable */
-        fwrq->thread = th;
-        fwrq->free = false;
-        return fwrq;
+    if (wrq) {
+        if (!atomic_compare_exchange_strong(&wrq->free, &(atomic_int){ 1 }, 0)) {
+            /* Race condition, another thread took it right before us. Trying another one */
+            goto retry;
+        }
+        wrq->thread = th;
+    } else {
+        /* No free queue that fits our needs... Adding a new one. */
+        wrq = logger_alloc_write_queue(logger, th, lines_max);
     }
-    /* No free queue that fits our needs... Adding a new one. */
-    return logger_alloc_write_queue(logger, th, lines_max);
+    fprintf(stderr, "W%02d! logger_get_write_queue(0x%p, %d) = 0x%p (%d)\n",
+                    wrq->thread_idx, logger, lines_max, wrq, wrq->queue_idx);
+    return wrq;
 }
 
-int	logger_free_write_queue(logger_t *logger, logger_write_queue_t *wrq)
+int logger_free_write_queue(logger_t *logger, logger_write_queue_t *wrq)
 {
     if (!wrq) {
         wrq = logger_get_write_queue(logger, -1);
     }
     wrq->thread = 0;
-    wrq->free = true;
+    atomic_store(&wrq->free, 1);
     return 0;
 }
 
@@ -183,7 +191,7 @@ reindex:
     l = &wrq->lines[index];
 
     while (l->ready) {
-        fprintf(stderr, "W%02d! Queue full ...\n", th);
+        fprintf(stderr, "W%02d! Queue full ... (%d)\n", th, wrq->queue_idx);
         if (atomic_compare_exchange_strong(&logger->waiting, &(atomic_int){ 1 }, 0)) {
             /* Wake-up lazy guy, there is something to do ! */
             fprintf(stderr, "W%02d! Waking up the logger ...\n", th);
@@ -221,7 +229,7 @@ reindex:
     l->line = line;
     vsprintf(l->str, format, ap);
 
-    fprintf(stderr, "W%02d> '%s'\n", th, l->str);
+    fprintf(stderr, "W%02d> '%s' (%d)\n", th, l->str, wrq->queue_idx);
 
     l->ready = true;
     wrq->wr_seq++;

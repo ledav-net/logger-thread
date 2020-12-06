@@ -68,16 +68,17 @@ struct logger_t;
 typedef struct {
     logger_line_t	*lines;     /* Lines buffer */
     int			lines_nr;   /* Maximum number of buffered lines for this thread */
+    int			queue_idx;  /* Index of the queue */
+    int			thread_idx; /* Thread index (for debugging...) */
     atomic_int		waiting;    /* True (1) if the thread is waiting for free space ... */
+    atomic_int		free;       /* True (1) if this queue is not used */
     unsigned int	rd_idx;     /* Read index */
     unsigned long	rd_seq;     /* Read sequence */
     unsigned long	wr_seq;     /* Write sequence */
     unsigned long	lost_total; /* Total number of lost records so far */
     unsigned long	lost;	    /* Number of lost records since last printed */
-    bool		free;       /* True if this queue is not used */
     struct logger_t	*logger;    /* Logger queue this write queue belongs to */
     pthread_t		thread;     /* Write thread owning this queue */
-    int			thread_idx;
 } logger_write_queue_t;
 
 typedef struct logger_t {
