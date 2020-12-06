@@ -181,9 +181,6 @@ static inline int _logger_init_lines_queue(logger_t *q, _logger_fuse_entry_t *fu
     memset(fuse, 0, fuse_nr * sizeof(_logger_fuse_entry_t));
 
     for (int i=0 ; i<fuse_nr; i++) {
-        if (!q->queues[i]) {
-            continue;
-        }
         logger_write_queue_t *wrq = q->queues[i];
 
         fuse[i].ts  = ~0; // Init all the queues as if they were empty
@@ -219,10 +216,12 @@ void *_thread_logger(logger_t *q)
 
         empty_nr = _logger_init_lines_queue(q, fuse_queue, fuse_nr);
 
-        while (!atomic_compare_exchange_strong(&q->reload, &(atomic_int){ 1 }, 0)) {
-
+        while (1) {
             empty_nr = _logger_enqueue_next_lines(fuse_queue, fuse_nr, empty_nr);
 
+            if (atomic_compare_exchange_strong(&q->reload, &(atomic_int){ 1 }, 0)) {
+                break;
+            }
             if (fuse_queue[0].ts == ~0) {
                 q->empty = true;
                 if (q->terminate) {
