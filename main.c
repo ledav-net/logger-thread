@@ -50,7 +50,7 @@ static void *thread_func_write(const _thread_params *thp)
     logger_write_queue_t *wrq;
     int th = atomic_fetch_add(&thread_idx, 1);
 
-    wrq = logger_std_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
+    wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
     wrq->thread_idx = th;
 
     for (int seq = 0; seq < thp->print_max; seq++) {
@@ -70,7 +70,7 @@ static void *thread_func_write(const _thread_params *thp)
         }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
-        fprintf(stderr, "W%02d? %lu logger_std_printf took %lu ns (%d)\n",
+        fprintf(stderr, "W%02d? %lu logger_printf took %lu ns (%d)\n",
                         th, timespec_to_ns(after), elapsed_ns(before, after), index);
     }
     fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost_total);
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
                     , thp.thread_max, thp.lines_min, thp.lines_max, thp.print_max, thp.chances, thp.uwait);
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
-    logger_std_init(thp.thread_max, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
+    logger_init(thp.thread_max, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
     sleep(start_wait);
 
     /* Writer threads */
@@ -115,6 +115,6 @@ int main(int argc, char **argv)
         pthread_join(tid[i], NULL);
     }
 
-    logger_deinit(NULL);
+    logger_deinit();
     return 0;
 }
