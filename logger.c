@@ -46,9 +46,6 @@ logger_write_queue_t *logger_alloc_write_queue(pthread_t thread, int lines_max)
     wrq->lines_nr = lines_max;
     wrq->thread = thread;
 
-    fprintf(stderr, "W..! logger_line_t = %d x %d bytes (%d kb allocated)\n",
-                    lines_max, sizeof(logger_line_t), sizeof(logger_line_t) * lines_max / 1024);
-
     /* Ensure this is done atomically between writers. Reader is safe. */
     pthread_mutex_lock(&logger.queues_mx);
     wrq->queue_idx = logger.queues_nr;
@@ -110,11 +107,9 @@ logger_write_queue_t *logger_get_write_queue(int lines_max)
     static _Thread_local logger_write_queue_t *wrq = NULL; /* Local thread variable */
 
     if (wrq && !atomic_load(&wrq->free)) {
-        /* Return the queue actually in use by this thread */
-        fprintf(stderr, "W%02d! logger_get_write_queue(%d) = %p (%d)\n",
-                        wrq->thread_idx, lines_max, wrq, wrq->queue_idx);
         return wrq;
     }
+
     if (lines_max <= 0) {
         /* Caller don't want a specific size... */
         lines_max = logger.default_lines_nr;
@@ -143,12 +138,18 @@ retry:
             goto retry;
         }
         wrq->thread = th;
+        fprintf(stderr, "W%02d! Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
+                        wrq->thread_idx, wrq->queue_idx, lines_max, wrq->lines_nr);
     } else {
         /* No free queue that fits our needs... Adding a new one. */
         wrq = logger_alloc_write_queue(th, lines_max);
+        if (wrq) {
+            fprintf(stderr,
+                "W%02d! New queue allocated: %d = %d x %d bytes (%d kb allocated)\n",
+                wrq->thread_idx ?: -1, wrq->queue_idx, lines_max, sizeof(logger_line_t),
+                (lines_max * sizeof(logger_line_t)) >> 10);
+        }
     }
-    fprintf(stderr, "W%02d! logger_get_write_queue(%d) = %p (%d)\n",
-                    wrq->thread_idx, lines_max, wrq, wrq->queue_idx);
     return wrq;
 }
 

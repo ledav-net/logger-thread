@@ -47,10 +47,13 @@ atomic_int thread_idx = 0;
 /* Test thread */
 static void *thread_func_write(const _thread_params *thp)
 {
-    logger_write_queue_t *wrq;
     int th = atomic_fetch_add(&thread_idx, 1);
 
-    wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
+    logger_write_queue_t *wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
+    if (!wrq) {
+        fprintf(stderr, "W%02d! No queue available ! Exit !\n", th);
+        return NULL;
+    }
     wrq->thread_idx = th;
 
     for (int seq = 0; seq < thp->print_max; seq++) {
