@@ -76,6 +76,8 @@ static void *thread_func_write(const _thread_params *thp)
         fprintf(stderr, "W%02d? %lu logger_printf took %lu ns (%d)\n",
                         th, timespec_to_ns(after), elapsed_ns(before, after), index);
     }
+    logger_free_write_queue();
+
     fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost_total);
     return NULL;
 }
@@ -105,17 +107,20 @@ int main(int argc, char **argv)
                     , thp.thread_max, thp.lines_min, thp.lines_max, thp.print_max, thp.chances, thp.uwait);
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
-    logger_init(thp.thread_max, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
+    logger_init(thp.thread_max * 1.5, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
     sleep(start_wait);
 
     /* Writer threads */
+    thp.print_max >>= 1;
     pthread_t tid[thp.thread_max];
-    for (long i=0 ; i < thp.thread_max ; i++ ) {
-        pthread_create(&tid[i], NULL, (void *)thread_func_write, (void *)&thp);
-        pthread_setname_np(tid[i], "logger-writer");
-    }
-    for (int i=0 ; i < thp.thread_max ; i++ ) {
-        pthread_join(tid[i], NULL);
+    for (int i=0; i<2; i++) {
+        for (long i=0 ; i < thp.thread_max ; i++ ) {
+            pthread_create(&tid[i], NULL, (void *)thread_func_write, (void *)&thp);
+            pthread_setname_np(tid[i], "logger-writer");
+        }
+        for (int i=0 ; i < thp.thread_max ; i++ ) {
+            pthread_join(tid[i], NULL);
+        }
     }
 
     logger_deinit();

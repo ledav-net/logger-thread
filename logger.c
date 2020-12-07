@@ -93,7 +93,8 @@ void logger_deinit(void)
     for (int i = 0; i < logger.queues_nr; i++) {
         total += sizeof(logger_write_queue_t) + logger.queues[i]->lines_nr * sizeof(logger_line_t);
     }
-    fprintf(stderr, "total memory allocated for the queues = %d kb\n", total/1024);
+
+    fprintf(stderr, "total memory allocated for %d queues = %d kb\n", logger.queues_nr, total/1024);
 
     for (int i=0 ; i<logger.queues_nr; i++) {
         free(logger.queues[i]->lines);
@@ -135,6 +136,8 @@ retry:
     if (wrq) {
         if (!atomic_compare_exchange_strong(&wrq->free, &(atomic_int){ 1 }, 0)) {
             /* Race condition, another thread took it right before us. Trying another one */
+            fprintf(stderr, "W%02d! Race condition when trying to reuse queue %d ! Retrying...\n",
+                            wrq->thread_idx, wrq->queue_idx);
             goto retry;
         }
         wrq->thread = th;
@@ -153,10 +156,13 @@ retry:
     return wrq;
 }
 
-int logger_free_write_queue(logger_write_queue_t *wrq)
+int logger_free_write_queue(void)
 {
-    if (!wrq) {
-        wrq = logger_get_write_queue(-1);
+    logger_write_queue_t *wrq = logger_get_write_queue(-1);
+
+    while ( wrq->rd_seq != wrq->wr_seq ) {
+        /* Wait for the queue to be empty before leaving ... */
+        usleep(100);
     }
     wrq->thread = 0;
     atomic_store(&wrq->free, 1);

@@ -100,8 +100,7 @@ void			logger_deinit(void);	/* Empty the queues and free all the ressources */
 logger_write_queue_t *	logger_get_write_queue(	/* Get a free write queue to work with */
                             int lines_max);	/* Max lines buffer (<=0 use default) */
 
-int			logger_free_write_queue(	/* Release the write queue for another thread */
-                            logger_write_queue_t *wrq);	/* Write queue to free (NULL = find it yourself) */
+int			logger_free_write_queue(void);	/* Release the write queue for another thread */
 
 logger_write_queue_t *	logger_alloc_write_queue(	/* Allocate a new write queue */
                             pthread_t thread,		/* Thread associated with this queue */
