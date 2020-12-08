@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#        <threads> <max per queue> <max per thread> <us wait> <wait luck value> [delay sec]
-default=( 10        100             1000             10000     110               5         )
+#        <threads> <min> <max> <print max / thd> <us wait> <wait chance> [delay sec]
+default=( 10       50    200   10000             100       10            5          )
 
 [ $# -gt 0 ] && params=(${*}) || params=(${default[*]})
 

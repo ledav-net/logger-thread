@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <limits.h>
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
@@ -33,77 +34,144 @@
 // Uncomment to strip all the debug lines for this source.
 //#define fprintf
 
-logger_t *stdlogger = NULL;
+logger_t logger;
 
-logger_t *logger_init(unsigned int write_queues_max, unsigned int lines_max, logger_opts_t options)
+static _Thread_local logger_write_queue_t *own_wrq = NULL; /* Local thread variable */
+
+logger_write_queue_t *_logger_alloc_write_queue(pthread_t thread, int lines_max)
 {
-    logger_t *q;
-
-    if (!write_queues_max) {
-        return errno = EINVAL, NULL; // No writers, nothing to do ...
+    if (logger.queues_nr == logger.queues_max) {
+        return errno = ENOBUFS, NULL;
     }
-    q = calloc(1, sizeof(logger_t));
-    q->queues = calloc(write_queues_max, sizeof(logger_write_queue_t *));
-    q->queues_nr = write_queues_max;
-    q->options = options;
+    logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
+    wrq->lines = calloc(lines_max, sizeof(logger_line_t));
+    wrq->lines_nr = lines_max;
+    wrq->thread = thread;
 
-    for (int i=0 ; i < write_queues_max ; i++) {
-        logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
-        wrq->lines = calloc(lines_max, sizeof(logger_line_t));
-        wrq->lines_nr = lines_max;
-        wrq->queue_idx = i;
-        wrq->logger = q;
-        q->queues[i] = wrq;
-    }
-    /* Reader thread */
-    pthread_create(&q->reader_thread, NULL, (void *)_thread_logger, (void *)q);
-    pthread_setname_np(q->reader_thread, "logger-reader");
+    /* Ensure this is done atomically between writers. Reader is safe. */
+    pthread_mutex_lock(&logger.queues_mx);
+    wrq->queue_idx = logger.queues_nr;
+    logger.queues[logger.queues_nr++] = wrq;
+    pthread_mutex_unlock(&logger.queues_mx);
 
-    fprintf(stderr, "logger_line_t = %d (%d)\n",
-                    sizeof(logger_line_t), sizeof(logger_line_t) * lines_max);
-    return q;
+    /* Let the logger thread take this change into account when he can ... */
+    atomic_compare_exchange_strong(&logger.reload, &(atomic_int){ 0 }, 1);
+    return wrq;
 }
 
-void logger_deinit(logger_t *_q)
+int logger_init(unsigned int queues_max, logger_opts_t options)
 {
-    logger_t *q = _q ?: stdlogger;
+    memset(&logger, 0, sizeof(logger_t));
 
+    pthread_mutex_init(&logger.queues_mx, NULL);
+
+    logger.queues = calloc(queues_max, sizeof(logger_write_queue_t *));
+    logger.queues_max = queues_max;
+    logger.options = options;
+
+    own_wrq = NULL;
+
+    /* Reader thread */
+    pthread_create(&logger.reader_thread, NULL, (void *)_thread_logger, NULL);
+    pthread_setname_np(logger.reader_thread, "logger-reader");
+    return 0;
+}
+
+void logger_deinit(void)
+{
     /* Sync with the logger & force him to double-check the queues */
-    while (!q->waiting) {
+    while (!logger.waiting) {
         fprintf(stderr, "Waiting for logger ...\n");
         usleep(100);
     }
-    q->terminate = true;
-    atomic_store(&q->waiting, 0);
-    if (futex_wake(&q->waiting, 1) <= 0) {
-        fprintf(stderr, "Logger did not woke up (%m) !\n");
-    } else {
-        fprintf(stderr, "Joining logger ...\n");
-        pthread_join(q->reader_thread, NULL);
+    logger.terminate = true;
+    atomic_store(&logger.waiting, 0);
+    int r = futex_wake(&logger.waiting, 1);
+    if (r <= 0) {
+        fprintf(stderr, "Logger already woke up ?! (r=%d, %m)\n", r);
     }
-    for (int i=0 ; i<q->queues_nr; i++) {
-        free(q->queues[i]->lines);
+    fprintf(stderr, "Joining logger ...\n");
+    pthread_join(logger.reader_thread, NULL);
+
+    int total = 0;
+    for (int i = 0; i < logger.queues_nr; i++) {
+        total += sizeof(logger_write_queue_t) + logger.queues[i]->lines_nr * sizeof(logger_line_t);
     }
-    free(q->queues);
-    free(q);
+
+    fprintf(stderr, "total memory allocated for %d queues = %d kb\n", logger.queues_nr, total/1024);
+
+    for (int i=0 ; i<logger.queues_nr; i++) {
+        free(logger.queues[i]->lines);
+        free(logger.queues[i]);
+    }
+    free(logger.queues);
 }
 
-logger_write_queue_t *logger_get_write_queue(logger_t *logger)
+logger_write_queue_t *logger_get_write_queue(int lines_max)
 {
-    if (!logger) {
-        return errno = EBADF, NULL;
+    if (own_wrq) {
+        /* This is unique per writer */
+        return own_wrq;
     }
+    if (lines_max <= 0) {
+        /* Caller don't want a specific size... */
+        lines_max = logger.default_lines_nr;
+    }
+    logger_write_queue_t **queue = logger.queues;
+    logger_write_queue_t *fwrq;
     pthread_t th = pthread_self();
-
-    for (int i=0; i<stdlogger->queues_nr; i++) {
-        if (th == stdlogger->queues[i]->thread) {
-            return stdlogger->queues[i];
+    int last_lines_nr;
+retry:
+    /* Searching first for a free queue previously allocated */
+    last_lines_nr = INT_MAX;
+    fwrq = NULL;
+    for (int i=0; i < logger.queues_nr; i++) {
+        if (!atomic_load(&queue[i]->free)) {
+            continue;
+        }
+        /* Find the best free queue ... */
+        int lines_nr = queue[i]->lines_nr;
+        if (lines_max <= lines_nr && lines_nr < last_lines_nr) {
+            last_lines_nr = lines_nr;
+            fwrq = queue[i];
         }
     }
-    return errno = ECHILD, NULL;
+    if (fwrq) {
+        if (!atomic_compare_exchange_strong(&fwrq->free, &(atomic_int){ 1 }, 0)) {
+            /* Race condition, another thread took it right before us. Trying another one */
+            fprintf(stderr, "W%02d! Race condition when trying to reuse queue %d ! Retrying...\n",
+                            fwrq->thread_idx, fwrq->queue_idx);
+            goto retry;
+        }
+        fwrq->thread = th;
+        fprintf(stderr, "W%02d! Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
+                        fwrq->thread_idx, fwrq->queue_idx, lines_max, fwrq->lines_nr);
+    } else {
+        /* No free queue that fits our needs... Adding a new one. */
+        fwrq = _logger_alloc_write_queue(th, lines_max);
+        if (!fwrq) {
+            return NULL;
+        }
+        fprintf(stderr, "W%02d! New queue allocated: %d = %d x %d bytes (%d kb allocated)\n",
+                        fwrq->thread_idx ?: -1, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
+                        (lines_max * sizeof(logger_line_t)) >> 10);
+    }
+    own_wrq = fwrq;
+    return fwrq;
 }
 
-int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level_t level,
+int logger_free_write_queue(void)
+{
+    while (own_wrq->rd_seq != own_wrq->wr_seq) {
+        /* Wait for the queue to be empty before leaving ... */
+        usleep(100);
+    }
+    atomic_store(&own_wrq->free, 1);
+    own_wrq = NULL;
+    return 0;
+}
+
+int logger_printf(logger_line_level_t level,
         const char *src,
         const char *func,
         unsigned int line,
@@ -113,46 +181,45 @@ int logger_printf(logger_t *logger, logger_write_queue_t *wrq, logger_line_level
     int th, index;
     logger_line_t *l;
 
-    if (logger->terminate) {
-        fprintf(stderr, "Queue is closed !\n");
+    if (logger.terminate) {
         return errno = ESHUTDOWN, -1;
     }
-    if (!wrq) {
-        wrq = logger_get_write_queue(logger);
+    if (!own_wrq) {
+        own_wrq = logger_get_write_queue(-1);
     }
-    th = wrq->queue_idx;
+    th = own_wrq->thread_idx;
 
 reindex:
-    index = wrq->wr_seq % wrq->lines_nr;
-    l = &wrq->lines[index];
+    index = own_wrq->wr_seq % own_wrq->lines_nr;
+    l = &own_wrq->lines[index];
 
     while (l->ready) {
-        fprintf(stderr, "W%02d! Queue full ...\n", th);
-        if (atomic_compare_exchange_strong(&logger->waiting, &(atomic_int){ 1 }, 0)) {
+        fprintf(stderr, "W%02d! Queue full ... (%d)\n", th, own_wrq->queue_idx);
+        if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
             /* Wake-up lazy guy, there is something to do ! */
             fprintf(stderr, "W%02d! Waking up the logger ...\n", th);
-            if (futex_wake(&logger->waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
+            if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
                 fprintf(stderr, "W%02d! ERROR: %m !\n", th);
                 return -1;
             }
             usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
             continue;
         }
-        if (logger->options & LOGGER_OPT_NONBLOCK) {
-            wrq->lost++;
-            fprintf(stderr, "W%02d! Line dropped (%d %s) !\n", th, wrq->lost,
-                    logger->options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
+        if (logger.options & LOGGER_OPT_NONBLOCK) {
+            own_wrq->lost++;
+            fprintf(stderr, "W%02d! Line dropped (%d %s) !\n", th, own_wrq->lost,
+                    logger.options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
         usleep(50);
     }
-    if (wrq->lost && logger->options & LOGGER_OPT_PRINTLOST) {
-        int lost = wrq->lost;
-        wrq->lost_total += wrq->lost;
-        wrq->lost = 0;
+    if (own_wrq->lost && logger.options & LOGGER_OPT_PRINTLOST) {
+        int lost = own_wrq->lost;
+        own_wrq->lost_total += lost;
+        own_wrq->lost = 0;
 
-        logger_printf(logger, wrq, LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__,
-            "Lost %d log line(s) (%d so far) !", lost, wrq->lost_total);
+        logger_printf(LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__,
+            "Lost %d log line(s) (%d so far) !", lost, own_wrq->lost_total);
 
         goto reindex;
     }
@@ -165,15 +232,15 @@ reindex:
     l->line = line;
     vsprintf(l->str, format, ap);
 
-    fprintf(stderr, "W%02d> '%s'\n", th, l->str);
+    fprintf(stderr, "W%02d> '%s' (%d)\n", th, l->str, own_wrq->queue_idx);
 
     l->ready = true;
-    wrq->wr_seq++;
+    own_wrq->wr_seq++;
 
-    if (atomic_compare_exchange_strong(&logger->waiting, &(atomic_int){ 1 }, 0)) {
+    if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
         /* Wake-up lazy guy, there is something to do ! */
         fprintf(stderr, "W%02d! Waking up the logger ...\n", th);
-        if (futex_wake(&logger->waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
+        if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
             return -1;
         }
     }

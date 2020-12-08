@@ -45,6 +45,6 @@ inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
     return syscall(SYS_futex, uaddr, futex_op, val, tv);
 }
 
-extern void *	_thread_logger(logger_t *q);
+extern void *	_thread_logger(void);
 
 #endif

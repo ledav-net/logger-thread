@@ -1,3 +1,4 @@
 logger
 *.log
 tags
+core*
