@@ -186,6 +186,9 @@ int logger_printf(logger_line_level_t level,
     }
     if (!own_wrq) {
         own_wrq = logger_get_write_queue(-1);
+        if (!own_wrq) {
+            return -1;
+        }
     }
     th = own_wrq->thread_idx;
 
