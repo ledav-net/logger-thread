@@ -95,19 +95,14 @@ int			logger_init(			/* Initialize the logger manager */
                             unsigned int lines_def,	/* Recommanded log lines to allocate by default */
                             logger_opts_t options);	/* See options above. */
 
-void			logger_deinit(void);	/* Empty the queues and free all the ressources */
+void			logger_deinit(void);		/* Empty the queues and free all the ressources */
 
-logger_write_queue_t *	logger_get_write_queue(	/* Get a free write queue to work with */
-                            int lines_max);	/* Max lines buffer (<=0 use default) */
+logger_write_queue_t *	logger_get_write_queue(		/* Get a free write queue to work with */
+                            int lines_max);		/* Max lines buffer (<=0 use default) */
 
 int			logger_free_write_queue(void);	/* Release the write queue for another thread */
 
-logger_write_queue_t *	logger_alloc_write_queue(	/* Allocate a new write queue */
-                            pthread_t thread,		/* Thread associated with this queue */
-                            int lines_max);		/* Lines max */
-
 int			logger_printf(			/* Print a message */
-                            logger_write_queue_t *wrq,	/* Write queue to print to (NULL = find it yourself) */
                             logger_line_level_t level,	/* Importance level of this print */
                             const char *src,		/* Source/Func/Line this print was issued */
                             const char *func,
@@ -126,84 +121,72 @@ extern logger_t logger; /* Global logger context */
 
 #ifndef LOGGER_DISABLED
 #define LOG_LEVEL(lvl, fmt, ...) logger_printf( \
-    NULL, \
     (lvl), \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_EMERGENCY(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_EMERGENCY, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_ALERT(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_ALERT, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_CRITICAL(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_CRITICAL, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_ERROR(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_ERROR, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_WARNING(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_WARNING, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_NOTICE(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_NOTICE, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_INFO(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_INFO, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_DEBUG(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_DEBUG, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_OKAY(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_OKAY, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_OOPS(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_OOPS, \
     __FILE__, \
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
 #define LOG_TRACE(fmt, ...)	logger_printf( \
-    NULL, \
     LOGGER_LEVEL_TRACE, \
     __FILE__, \
     __FUNCTION__, \

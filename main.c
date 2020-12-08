@@ -56,7 +56,8 @@ static void *thread_func_write(const _thread_params *thp)
     }
     wrq->thread_idx = th;
 
-    for (int seq = 0; seq < thp->print_max; seq++) {
+    int seq;
+    for (seq = 0; seq < thp->print_max; seq++) {
         int index = wrq->wr_seq % wrq->lines_nr;
 
         if (!(rand() % thp->chances)) {
@@ -78,7 +79,7 @@ static void *thread_func_write(const _thread_params *thp)
     }
     logger_free_write_queue();
 
-    fprintf(stderr, "W%02d! Exit (%d lines dropped)\n", th, wrq->lost_total);
+    fprintf(stderr, "W%02d! Exit (%lu/%d lines printed/dropped)\n", th, seq, wrq->lost_total);
     return NULL;
 }
 
@@ -111,9 +112,9 @@ int main(int argc, char **argv)
     sleep(start_wait);
 
     /* Writer threads */
-    thp.print_max >>= 1;
+    thp.print_max >>= 2; // /4
     pthread_t tid[thp.thread_max];
-    for (int i=0; i<2; i++) {
+    for (int i=0; i<4; i++) {
         for (long i=0 ; i < thp.thread_max ; i++ ) {
             pthread_create(&tid[i], NULL, (void *)thread_func_write, (void *)&thp);
             pthread_setname_np(tid[i], "logger-writer");
