@@ -241,7 +241,7 @@ reindex:
     l->file = src;
     l->func = func;
     l->line = line;
-    vsprintf(l->str, format, ap);
+    vsnprintf(l->str, sizeof(l->str), format, ap);
 
     fprintf(stderr, "W%02d> '%s' (%d)\n", th, l->str, own_wrq->queue_idx);
 
