@@ -226,7 +226,7 @@ void *_thread_logger(void)
                 if (logger.terminate) {
                     /* We want to terminate when all the queues are empty ! */
                     terminate = true;
-                    break; // while (2)
+                    break; // while (1)
                 }
                 if (really_empty < 5) {
                     int wait = 32 << really_empty++;
@@ -241,6 +241,7 @@ void *_thread_logger(void)
                 atomic_store(&logger.waiting, 1);
                 if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
                     fprintf(stderr, "RDR! ERROR: %m !\n");
+                    terminate = true;
                     break;
                 }
                 continue;

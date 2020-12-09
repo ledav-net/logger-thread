@@ -97,7 +97,6 @@ void logger_deinit(void)
     for (int i = 0; i < logger.queues_nr; i++) {
         total += sizeof(logger_write_queue_t) + logger.queues[i]->lines_nr * sizeof(logger_line_t);
     }
-
     fprintf(stderr, "total memory allocated for %d queues = %d kb\n", logger.queues_nr, total/1024);
 
     for (int i=0 ; i<logger.queues_nr; i++) {

@@ -24,10 +24,8 @@
 #define LOGGER_LINE_SZ		2048			/* Maximum size per log msg (\0 included) */
 
 typedef enum {
-    LOGGER_LEVEL_FIRST		= 0,			/* First level value */
-
     /* Levels compatibles with syslog */
-    LOGGER_LEVEL_EMERG		= LOGGER_LEVEL_FIRST,	/* Emergecy: System is unusable. Complete restart/checks must be done.	*/
+    LOGGER_LEVEL_EMERG		= 0,			/* Emergecy: System is unusable. Complete restart/checks must be done.	*/
     LOGGER_LEVEL_ALERT		= 1,			/* Alert:    Process can't continue working. Manual action must be done.*/
     LOGGER_LEVEL_CRITICAL	= 2,			/* Crit:     Process was entered in an unknown state.			*/
     LOGGER_LEVEL_ERROR		= 3,			/* Error:    Error is returned from function, etc...			*/
@@ -35,13 +33,13 @@ typedef enum {
     LOGGER_LEVEL_NOTICE		= 5,			/* Notice:   Message could be important/interresting to know.		*/
     LOGGER_LEVEL_INFO		= 6,			/* Info:     Message is symply informational...				*/
     LOGGER_LEVEL_DEBUG		= 7,			/* Debug:    Message is for debugging informations only.		*/
-
     /* Custom levels */
     LOGGER_LEVEL_OKAY,					/* Okay:     Commit. What is expected happened.				*/
     LOGGER_LEVEL_TRACE,					/* Trace:    Trace lines. To easily filter out hudge amount of lines    */
     LOGGER_LEVEL_OOPS,					/* Oops:     Something not foreseen happened (code mistakes, config, .) */
-
+    /* Internal use */
     LOGGER_LEVEL_COUNT,					/* Number of levels */
+    LOGGER_LEVEL_FIRST = LOGGER_LEVEL_EMERG,		/* First level value */
     LOGGER_LEVEL_LAST  = LOGGER_LEVEL_COUNT - 1,	/* Last level value */
 } logger_line_level_t;
 
