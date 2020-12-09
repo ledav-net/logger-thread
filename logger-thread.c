@@ -88,21 +88,22 @@ static const char *_logger_get_time(unsigned long sec, _logger_line_colors_t *c)
 
 static int _logger_write_line(logger_opts_t options, bool colored, const logger_write_queue_t *wrq, const logger_line_t *l)
 {
-    char linestr[LOGGER_LINE_SZ+256];
+    char linestr[LOGGER_LINE_SZ + LOGGER_MAX_PREFIX_SZ];
     _logger_line_colors_t c;
 
     /* Color scheme to use if needed */
     if ( colored ) {
+        /* TODO: To be moved into logger_t (default scheme) */
         c = _logger_line_colors;
         c.level = _logger_level_color[l->level];
     } else {
         c = _logger_line_no_colors;
     }
     /* File/Function/Line */
-    char src_str[128], *b = src_str;
+    char src_str[128], *start_of_src_str = src_str;
     int len = snprintf(src_str, sizeof(src_str), "%s:%s:%d", l->file, l->func, l->line);
     if ( len > 35 ) {
-        b += len - 35;
+        start_of_src_str += len - 35;
     }
     /* Time stamp calculations */
     unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
@@ -110,12 +111,13 @@ static int _logger_write_line(logger_opts_t options, bool colored, const logger_
     int sec            = l->ts.tv_sec % 60;
     /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
-            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s <%lu> %s\n",
+            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s <%s%15s%s> %s\n",
             _logger_get_date(l->ts.tv_sec, &c),
             _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
             c.level, _logger_level_label[l->level], c.reset,
-            b, wrq->thread, l->str);
+            start_of_src_str,
+            c.thread_name, wrq->thread_name, c.reset, l->str);
     /* Print */
     return write(1, linestr, len);
 }

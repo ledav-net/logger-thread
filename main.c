@@ -47,7 +47,11 @@ atomic_int thread_idx = 0;
 /* Test thread */
 static void *thread_func_write(const _thread_params *thp)
 {
+    char th_name[LOGGER_MAX_THREAD_NAME_SZ];
     int th = atomic_fetch_add(&thread_idx, 1);
+
+    snprintf(th_name, sizeof(th_name), "logger-W%02d", th);
+    pthread_setname_np(pthread_self(), th_name);
 
     logger_write_queue_t *wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
     if (!wrq) {
@@ -117,7 +121,6 @@ int main(int argc, char **argv)
     for (int i=0; i<4; i++) {
         for (long i=0 ; i < thp.thread_max ; i++ ) {
             pthread_create(&tid[i], NULL, (void *)thread_func_write, (void *)&thp);
-            pthread_setname_np(tid[i], "logger-writer");
         }
         for (int i=0 ; i < thp.thread_max ; i++ ) {
             pthread_join(tid[i], NULL);

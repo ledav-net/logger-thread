@@ -21,7 +21,9 @@
 #include <stdatomic.h>
 #include <time.h>
 
-#define LOGGER_LINE_SZ		2048			/* Maximum size per log msg (\0 included) */
+#define LOGGER_LINE_SZ			2048	/* Maximum size per log msg (\0 included) */
+#define LOGGER_MAX_PREFIX_SZ		256	/* Added to LOGGER_LINE_SZ for the date/time/... */
+#define LOGGER_MAX_THREAD_NAME_SZ	16	/* Maximum size for the thread name (if it is set) */
 
 typedef enum {
     /* Levels compatibles with syslog */
@@ -62,17 +64,18 @@ typedef struct {
 
 /* Write queue: 1 per thread */
 typedef struct {
-    logger_line_t	*lines;     /* Lines buffer */
-    int			lines_nr;   /* Maximum number of buffered lines for this thread */
-    int			queue_idx;  /* Index of the queue */
-    int			thread_idx; /* Thread index (for debugging...) */
-    unsigned int	rd_idx;     /* Read index */
-    unsigned long	rd_seq;     /* Read sequence */
-    unsigned long	wr_seq;     /* Write sequence */
-    unsigned long	lost_total; /* Total number of lost records so far */
-    unsigned long	lost;	    /* Number of lost records since last printed */
-    atomic_int		free;       /* True (1) if this queue is not used */
-    pthread_t		thread;     /* Thread owning this queue */
+    logger_line_t	*lines;			/* Lines buffer */
+    int			lines_nr;		/* Maximum number of buffered lines for this thread */
+    int			queue_idx;		/* Index of the queue */
+    int			thread_idx;		/* Thread index (for debugging...) */
+    unsigned int	rd_idx;			/* Actual read index */
+    unsigned long	rd_seq;			/* Read sequence */
+    unsigned long	wr_seq;			/* Write sequence */
+    unsigned long	lost_total;		/* Total number of lost records so far */
+    unsigned long	lost;			/* Number of lost records since last printed */
+    atomic_int		free;			/* True (1) if this queue is not used */
+    pthread_t		thread;			/* Thread owning this queue */
+    char		thread_name[LOGGER_MAX_THREAD_NAME_SZ]; /* Thread name */
 } logger_write_queue_t;
 
 typedef struct {

@@ -26,6 +26,7 @@ typedef struct {
     const char *time;
     const char *date;
     const char *date_lines;
+    const char *thread_name;
 } _logger_line_colors_t;
 
 extern const char * const _logger_level_color[LOGGER_LEVEL_COUNT];

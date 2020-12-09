@@ -38,11 +38,13 @@ const _logger_line_colors_t _logger_line_no_colors = {
     .time  = "",
     .date  = "",
     .date_lines = "",
+    .thread_name = "",
 };
 
 const _logger_line_colors_t _logger_line_colors = {
-    .reset      = C_RST,
-    .time       = C_RST,
-    .date       = C_DG,
-    .date_lines = C_LG,
+    .reset       = C_RST,
+    .time        = C_RST,
+    .date        = C_DG,
+    .date_lines  = C_LG,
+    .thread_name = C_DW,
 };

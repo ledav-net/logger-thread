@@ -38,7 +38,16 @@ logger_t logger;
 
 static _Thread_local logger_write_queue_t *own_wrq = NULL; /* Local thread variable */
 
-logger_write_queue_t *_logger_alloc_write_queue(pthread_t thread, int lines_max)
+static void _logger_set_thread_name(logger_write_queue_t *wrq)
+{
+    wrq->thread = pthread_self();
+    pthread_getname_np(wrq->thread, wrq->thread_name, sizeof(wrq->thread_name));
+    if (!wrq->thread_name[0]) {
+        snprintf(wrq->thread_name, LOGGER_MAX_THREAD_NAME_SZ, "%lu", wrq->thread);
+    }
+}
+
+logger_write_queue_t *_logger_alloc_write_queue(int lines_max)
 {
     if (logger.queues_nr == logger.queues_max) {
         return errno = ENOBUFS, NULL;
@@ -46,7 +55,7 @@ logger_write_queue_t *_logger_alloc_write_queue(pthread_t thread, int lines_max)
     logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
     wrq->lines = calloc(lines_max, sizeof(logger_line_t));
     wrq->lines_nr = lines_max;
-    wrq->thread = thread;
+    _logger_set_thread_name(wrq);
 
     /* Ensure this is done atomically between writers. Reader is safe. */
     pthread_mutex_lock(&logger.queues_mx);
@@ -118,7 +127,6 @@ logger_write_queue_t *logger_get_write_queue(int lines_max)
     }
     logger_write_queue_t **queue = logger.queues;
     logger_write_queue_t *fwrq;
-    pthread_t th = pthread_self();
     int last_lines_nr;
 retry:
     /* Searching first for a free queue previously allocated */
@@ -142,12 +150,13 @@ retry:
                             fwrq->thread_idx, fwrq->queue_idx);
             goto retry;
         }
-        fwrq->thread = th;
+        _logger_set_thread_name(fwrq);
+
         fprintf(stderr, "W%02d! Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
                         fwrq->thread_idx, fwrq->queue_idx, lines_max, fwrq->lines_nr);
     } else {
         /* No free queue that fits our needs... Adding a new one. */
-        fwrq = _logger_alloc_write_queue(th, lines_max);
+        fwrq = _logger_alloc_write_queue(lines_max);
         if (!fwrq) {
             return NULL;
         }
