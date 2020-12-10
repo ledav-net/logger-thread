@@ -101,9 +101,10 @@ static int _logger_write_line(logger_opts_t options, bool colored, const logger_
     }
     /* File/Function/Line */
     char src_str[128], *start_of_src_str = src_str;
-    int len = snprintf(src_str, sizeof(src_str), "%s:%s:%d", l->file, l->func, l->line);
-    if ( len > 35 ) {
-        start_of_src_str += len - 35;
+    int len = snprintf(src_str, sizeof(src_str), "%24s %20s %4d"
+                                               , l->file, l->func, l->line);
+    if ( len > LOGGER_MAX_SOURCE_LEN ) {
+        start_of_src_str += len - LOGGER_MAX_SOURCE_LEN;
     }
     /* Time stamp calculations */
     unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
@@ -111,13 +112,13 @@ static int _logger_write_line(logger_opts_t options, bool colored, const logger_
     int sec            = l->ts.tv_sec % 60;
     /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
-            "%s%s:%02d.%03lu,%03lu [%s%s%s] %35s <%s%15s%s> %s\n",
+            "%s%s:%02d.%03lu,%03lu [%s%s%s] %*s <%s%*s%s> %s\n",
             _logger_get_date(l->ts.tv_sec, &c),
             _logger_get_time(l->ts.tv_sec, &c),
             sec, msec, usec,
             c.level, _logger_level_label[l->level], c.reset,
-            start_of_src_str,
-            c.thread_name, wrq->thread_name, c.reset, l->str);
+            LOGGER_MAX_SOURCE_LEN, start_of_src_str,
+            c.thread_name, sizeof(wrq->thread_name)-1, wrq->thread_name, c.reset, l->str);
     /* Print */
     return write(1, linestr, len);
 }

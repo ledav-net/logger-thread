@@ -25,6 +25,8 @@
 #define LOGGER_MAX_PREFIX_SZ		256	/* Added to LOGGER_LINE_SZ for the date/time/... */
 #define LOGGER_MAX_THREAD_NAME_SZ	16	/* Maximum size for the thread name (if it is set) */
 
+#define LOGGER_MAX_SOURCE_LEN		50	/* Maximum length of "file:src:line" sub string */
+
 typedef enum {
     /* Levels compatibles with syslog */
     LOGGER_LEVEL_EMERG		= 0,			/* Emergecy: System is unusable. Complete restart/checks must be done.	*/
