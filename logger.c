@@ -77,6 +77,7 @@ int logger_init(unsigned int queues_max, logger_opts_t options)
     logger.queues = calloc(queues_max, sizeof(logger_write_queue_t *));
     logger.queues_max = queues_max;
     logger.options = options;
+    logger.theme = &logger_colors_default;
 
     own_wrq = NULL;
 

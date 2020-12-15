@@ -15,36 +15,36 @@
  */
 
 #include "colors.h"
-#include "logger-colors.h"
 #include "logger.h"
 
-const char * const _logger_level_color[LOGGER_LEVEL_COUNT] = {
-    [LOGGER_LEVEL_EMERG]    = C_BR C_LW,
-    [LOGGER_LEVEL_ALERT]    = C_UNL C_LR,
-    [LOGGER_LEVEL_CRITICAL] = C_LR,
-    [LOGGER_LEVEL_ERROR]    = C_DR,
-    [LOGGER_LEVEL_WARNING]  = C_DY,
-    [LOGGER_LEVEL_NOTICE]   = C_DW,
-    [LOGGER_LEVEL_INFO]     = C_DB,
-    [LOGGER_LEVEL_DEBUG]    = C_DM,
-    [LOGGER_LEVEL_OKAY]     = C_DG,
-    [LOGGER_LEVEL_TRACE]    = C_DC,
-    [LOGGER_LEVEL_OOPS]     = C_LW,
-};
-
-const _logger_line_colors_t _logger_line_no_colors = {
+const logger_line_colors_t logger_colors_bw = {
     .reset = "",
-    .level = "",
+    .level = {
+        [LOGGER_LEVEL_FIRST ... LOGGER_LEVEL_LAST] = "",
+    },
     .time  = "",
     .date  = "",
     .date_lines = "",
     .thread_name = "",
 };
 
-const _logger_line_colors_t _logger_line_colors = {
+const logger_line_colors_t logger_colors_default = {
+    .level       = {
+        [LOGGER_LEVEL_EMERG]    = C_BR C_LW,
+        [LOGGER_LEVEL_ALERT]    = C_UNL C_LR,
+        [LOGGER_LEVEL_CRITICAL] = C_LR,
+        [LOGGER_LEVEL_ERROR]    = C_DR,
+        [LOGGER_LEVEL_WARNING]  = C_DY,
+        [LOGGER_LEVEL_NOTICE]   = C_DW,
+        [LOGGER_LEVEL_INFO]     = C_DB,
+        [LOGGER_LEVEL_DEBUG]    = C_DM,
+        [LOGGER_LEVEL_OKAY]     = C_DG,
+        [LOGGER_LEVEL_TRACE]    = C_DC,
+        [LOGGER_LEVEL_OOPS]     = C_LW,
+    },
     .reset       = C_RST,
-    .time        = C_RST,
-    .date        = C_DG,
-    .date_lines  = C_LG,
+    .time        = "",
+    .date        = C_LG,
+    .date_lines  = C_DG,
     .thread_name = C_DW,
 };

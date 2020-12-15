@@ -81,17 +81,27 @@ typedef struct {
 } logger_write_queue_t;
 
 typedef struct {
-    logger_write_queue_t **queues;		/* Write queues, 1 per thread */
-    int			 queues_nr;		/* Number of queues allocated */
-    int			 queues_max;		/* Maximum number of possible queues */
-    int			 default_lines_nr;	/* Default number of lines max / buffer to use */
-    bool		 terminate;		/* Set to true when the reader thread has to finish */
-    bool		 empty;			/* Set to true when all the queues are empty */
-    logger_opts_t	 options;		/* Logger options */
-    atomic_int		 reload;		/* True (1) when new queue(s) are added */
-    atomic_int		 waiting;		/* True (1) if the reader-thread is sleeping ... */
-    pthread_t		 reader_thread;		/* TID of the reader thread */
-    pthread_mutex_t	 queues_mx;		/* Needed when extending the **queues array... */
+    const char *level[LOGGER_LEVEL_COUNT];		/* Colors definition for the log levels */
+    const char *reset;					/* Reset the color to default */
+    const char *time;					/* Time string color */
+    const char *date;					/* Date string color */
+    const char *date_lines;				/* Lines surrounding the date color */
+    const char *thread_name;				/* Thread name (or id) color */
+} logger_line_colors_t;
+
+typedef struct {
+    logger_write_queue_t	**queues;		/* Write queues, 1 per thread */
+    int			 	queues_nr;		/* Number of queues allocated */
+    int			 	queues_max;		/* Maximum number of possible queues */
+    int			 	default_lines_nr;	/* Default number of lines max / buffer to use */
+    bool		 	terminate;		/* Set to true when the reader thread has to finish */
+    bool		 	empty;			/* Set to true when all the queues are empty */
+    logger_opts_t	 	options;		/* Logger options */
+    atomic_int		 	reload;			/* True (1) when new queue(s) are added */
+    atomic_int		 	waiting;		/* True (1) if the reader-thread is sleeping ... */
+    pthread_t		 	reader_thread;		/* TID of the reader thread */
+    pthread_mutex_t	 	queues_mx;		/* Needed when extending the **queues array... */
+    const logger_line_colors_t	*theme;			/* Color theme to use */
 } logger_t;
 
 int			logger_init(			/* Initialize the logger manager */
@@ -113,6 +123,9 @@ int			logger_printf(			/* Print a message */
                             const char *format, ...);	/* printf() like format & arguments ... */
 
 extern logger_t logger; /* Global logger context */
+
+extern const logger_line_colors_t logger_colors_bw;	/* No colors theme (black & white) */
+extern const logger_line_colors_t logger_colors_default;/* Default theme */
 
 #define timespec_to_ns(a)	((STON((a).tv_sec) + (a).tv_nsec))
 #define elapsed_ns(b,a) 	(timespec_to_ns(a) - timespec_to_ns(b))

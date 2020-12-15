@@ -27,7 +27,6 @@
 #include <time.h>
 
 #include "logger.h"
-#include "logger-colors.h"
 #include "logger-thread.h"
 
 static const char * const _logger_level_label[LOGGER_LEVEL_COUNT] = {
@@ -52,7 +51,7 @@ typedef struct {
 // Uncomment to strip all the debug lines for this source.
 //#define fprintf
 
-static const char *_logger_get_date(unsigned long sec, _logger_line_colors_t *c)
+static const char *_logger_get_date(unsigned long sec, const logger_line_colors_t *c)
 {
     static char date[64];
     static unsigned long prev_sec = 0;
@@ -70,7 +69,7 @@ static const char *_logger_get_date(unsigned long sec, _logger_line_colors_t *c)
     return "";
 }
 
-static const char *_logger_get_time(unsigned long sec, _logger_line_colors_t *c)
+static const char *_logger_get_time(unsigned long sec, const logger_line_colors_t *c)
 {
     static char time[32];
     static unsigned long prev_sec = 0;
@@ -86,19 +85,11 @@ static const char *_logger_get_time(unsigned long sec, _logger_line_colors_t *c)
     return time;
 }
 
-static int _logger_write_line(logger_opts_t options, bool colored, const logger_write_queue_t *wrq, const logger_line_t *l)
+static int _logger_write_line(const logger_write_queue_t *wrq, const logger_line_t *l)
 {
     char linestr[LOGGER_LINE_SZ + LOGGER_MAX_PREFIX_SZ];
-    _logger_line_colors_t c;
+    const logger_line_colors_t *c = logger.theme;
 
-    /* Color scheme to use if needed */
-    if ( colored ) {
-        /* TODO: To be moved into logger_t (default scheme) */
-        c = _logger_line_colors;
-        c.level = _logger_level_color[l->level];
-    } else {
-        c = _logger_line_no_colors;
-    }
     /* File/Function/Line */
     char src_str[128], *start_of_src_str = src_str;
     int len = snprintf(src_str, sizeof(src_str), "%24s %20s %4d"
@@ -113,12 +104,12 @@ static int _logger_write_line(logger_opts_t options, bool colored, const logger_
     /* Format all together */
     len = snprintf(linestr, sizeof(linestr),
             "%s%s:%02d.%03lu,%03lu [%s%s%s] %*s <%s%*s%s> %s\n",
-            _logger_get_date(l->ts.tv_sec, &c),
-            _logger_get_time(l->ts.tv_sec, &c),
+            _logger_get_date(l->ts.tv_sec, c),
+            _logger_get_time(l->ts.tv_sec, c),
             sec, msec, usec,
-            c.level, _logger_level_label[l->level], c.reset,
+            c->level[l->level], _logger_level_label[l->level], c->reset,
             LOGGER_MAX_SOURCE_LEN, start_of_src_str,
-            c.thread_name, sizeof(wrq->thread_name)-1, wrq->thread_name, c.reset, l->str);
+            c->thread_name, sizeof(wrq->thread_name)-1, wrq->thread_name, c->reset, l->str);
     /* Print */
     return write(1, linestr, len);
 }
@@ -253,7 +244,7 @@ void *_thread_logger(void)
             really_empty = 0;
 
             logger_write_queue_t *wrq = fuse_queue[0].wrq;
-            int rv = _logger_write_line(logger.options, true, wrq, &wrq->lines[wrq->rd_idx]);
+            int rv = _logger_write_line(wrq, &wrq->lines[wrq->rd_idx]);
             if (rv < 0) {
                 fprintf(stderr, "RDR: logger_write_line(): %m\n");
                 break;
