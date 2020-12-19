@@ -65,7 +65,7 @@ static void *thread_func_write(const _thread_params *thp)
         int index = wrq->wr_seq % wrq->lines_nr;
 
         if (!(rand() % thp->chances)) {
-            fprintf(stderr, "W%02d! Bad luck, waiting for %lu usec\n", th, thp->uwait);
+            fprintf(stderr, "W%02d! Bad luck, waiting for %d usec\n", th, thp->uwait);
             usleep(thp->uwait);
         }
         struct timespec before, after;
@@ -74,7 +74,7 @@ static void *thread_func_write(const _thread_params *thp)
         clock_gettime(CLOCK_MONOTONIC, &before);
 
         if ( LOG_LEVEL(level, "W%02d %lu => %d", th, seq, index) < 0 ) {
-            fprintf(stderr, "W%02d! %lu => %d **LOST** (%m)\n", th, seq, index);
+            fprintf(stderr, "W%02d! %d => %d **LOST** (%m)\n", th, seq, index);
         }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -83,7 +83,7 @@ static void *thread_func_write(const _thread_params *thp)
     }
     logger_free_write_queue();
 
-    fprintf(stderr, "W%02d! Exit (%lu/%d lines printed/dropped)\n", th, seq, wrq->lost_total);
+    fprintf(stderr, "W%02d! Exit (%d/%lu lines printed/dropped)\n", th, seq, wrq->lost_total);
     return NULL;
 }
 
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
     srand(time(NULL));
 
     fprintf(stderr, "cmdline: "); for (int i=0; i<argc; i++) { fprintf(stderr, "%s ", argv[i]); }
-    fprintf(stderr, "\nthread_max[%d] lines_min[%d] lines_max[%d] print_max[%d] (1/%d chances to wait %d us)\n"
+    fprintf(stderr, "\nthread_max[%d] lines_min[%d] lines_max[%d] print_max[%lu] (1/%d chances to wait %d us)\n"
                     , thp.thread_max, thp.lines_min, thp.lines_max, thp.print_max, thp.chances, thp.uwait);
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 

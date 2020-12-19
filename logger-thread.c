@@ -59,7 +59,7 @@ static const char *_logger_get_date(unsigned long sec, const logger_line_colors_
     if (sec - prev_sec >= 60*60*24) {
         char tmp[16];
         struct tm tm;
-        localtime_r(&sec, &tm);
+        localtime_r((const time_t *)&sec, &tm);
         strftime(tmp, sizeof(tmp), "%Y-%m-%d", &tm);
         sprintf(date, "%s-- %s%s%s --%s\n",
                     c->date_lines, c->date, tmp, c->date_lines, c->reset);
@@ -77,7 +77,7 @@ static const char *_logger_get_time(unsigned long sec, const logger_line_colors_
     if (sec - prev_sec >= 60) {
         char tmp[8];
         struct tm tm;
-        localtime_r(&sec, &tm);
+        localtime_r((const time_t *)&sec, &tm);
         strftime(tmp, sizeof(tmp), "%H:%M", &tm);
         sprintf(time, "%s%s%s", c->time, tmp, c->reset);
         prev_sec = sec;
@@ -109,7 +109,7 @@ static int _logger_write_line(const logger_write_queue_t *wrq, const logger_line
             sec, msec, usec,
             c->level[l->level], _logger_level_label[l->level], c->reset,
             LOGGER_MAX_SOURCE_LEN, start_of_src_str,
-            c->thread_name, sizeof(wrq->thread_name)-1, wrq->thread_name, c->reset, l->str);
+            c->thread_name, (int)sizeof(wrq->thread_name)-1, wrq->thread_name, c->reset, l->str);
     /* Print */
     return write(1, linestr, len);
 }
@@ -188,7 +188,6 @@ void *_thread_logger(void)
     fprintf(stderr, "RDR! Starting...\n");
 
     while (!terminate) {
-        logger_write_queue_t *wrq;
         int empty_nr = 0;
         int really_empty = 0;
         int fuse_nr = logger.queues_nr;
@@ -204,7 +203,7 @@ void *_thread_logger(void)
         }
         _logger_fuse_entry_t fuse_queue[fuse_nr];
 
-        fprintf(stderr, "RDR! (re)loading... _logger_fuse_entry_t = %d x %d bytes (%d bytes total)\n",
+        fprintf(stderr, "RDR! (re)loading... _logger_fuse_entry_t = %d x %lu bytes (%lu bytes total)\n",
                         fuse_nr, sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
 
         empty_nr = _logger_init_lines_queue(fuse_queue, fuse_nr);

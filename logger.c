@@ -161,7 +161,7 @@ retry:
         if (!fwrq) {
             return NULL;
         }
-        fprintf(stderr, "W%02d! New queue allocated: %d = %d x %d bytes (%d kb allocated)\n",
+        fprintf(stderr, "W%02d! New queue allocated: %d = %d x %lu bytes (%lu kb allocated)\n",
                         fwrq->thread_idx ?: -1, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
                         (lines_max * sizeof(logger_line_t)) >> 10);
     }
@@ -219,7 +219,7 @@ reindex:
         }
         if (logger.options & LOGGER_OPT_NONBLOCK) {
             own_wrq->lost++;
-            fprintf(stderr, "W%02d! Line dropped (%d %s) !\n", th, own_wrq->lost,
+            fprintf(stderr, "W%02d! Line dropped (%lu %s) !\n", th, own_wrq->lost,
                     logger.options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
