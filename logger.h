@@ -21,7 +21,11 @@
 #include <stdatomic.h>
 #include <time.h>
 
-#define LOGGER_LINE_SZ			2048	/* Maximum size per log msg (\0 included) */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define LOGGER_LINE_SZ			1024	/* Maximum size per log msg (\0 included) */
 #define LOGGER_MAX_PREFIX_SZ		256	/* Added to LOGGER_LINE_SZ for the date/time/... */
 #define LOGGER_MAX_THREAD_NAME_SZ	16	/* Maximum size for the thread name (if it is set) */
 
@@ -69,7 +73,6 @@ typedef struct {
     logger_line_t	*lines;			/* Lines buffer */
     int			lines_nr;		/* Maximum number of buffered lines for this thread */
     int			queue_idx;		/* Index of the queue */
-    int			thread_idx;		/* Thread index (for debugging...) */
     unsigned int	rd_idx;			/* Actual read index */
     unsigned long	rd_seq;			/* Read sequence */
     unsigned long	wr_seq;			/* Write sequence */
@@ -93,7 +96,7 @@ typedef struct {
     logger_write_queue_t	**queues;		/* Write queues, 1 per thread */
     int			 	queues_nr;		/* Number of queues allocated */
     int			 	queues_max;		/* Maximum number of possible queues */
-    int			 	default_lines_nr;	/* Default number of lines max / buffer to use */
+    int				default_lines_nr;	/* Default number of lines max / buffer to use */
     bool		 	terminate;		/* Set to true when the reader thread has to finish */
     bool		 	empty;			/* Set to true when all the queues are empty */
     logger_opts_t	 	options;		/* Logger options */
@@ -105,7 +108,8 @@ typedef struct {
 } logger_t;
 
 int			logger_init(			/* Initialize the logger manager */
-                            unsigned int lines_def,	/* Recommanded log lines to allocate by default */
+                            int queues_max,		/* Hard limit of queues that can be allocated */
+                            int lines_max_def,		/* Recommanded log lines to allocate by default */
                             logger_opts_t options);	/* See options above. */
 
 void			logger_deinit(void);		/* Empty the queues and free all the ressources */
@@ -130,12 +134,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define timespec_to_ns(a)	((STON((a).tv_sec) + (a).tv_nsec))
 #define elapsed_ns(b,a) 	(timespec_to_ns(a) - timespec_to_ns(b))
 
-#define LOGGER_COLORS_ENABLED
-//#define LOGGER_DISABLED
-
-#define LOGGER_LEVEL_TRUNCATE	LOGGER_LEVEL_INFO	/* Higher levels than INFO are not handled */
-
-#ifndef LOGGER_DISABLED
+#if defined(LOGGER_USE_THREAD)
 #define LOG_LEVEL(lvl, fmt, ...) logger_printf( \
     (lvl), \
     __FILE__, \
@@ -208,20 +207,56 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
-#else
-#define LOG_LEVEL
-#define LOG_EMERGENCY
-#define LOG_ALERT
-#define LOG_CRITICAL
-#define LOG_ERROR
-#define LOG_WARNING
-#define LOG_NOTICE
-#define LOG_INFO
-#define LOG_DEBUG
+#endif
 
-#define LOG_OKAY
-#define LOG_OOPS
-#define LOG_TRACE
-#endif /* LOGGER_DISABLED */
+#if defined(LOGGER_USE_PRINTF)
+#include <stdio.h>
 
+#define _LOG_PRINTF(fmt, ...) \
+        printf("%s: %s: (%d) " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__)
+
+#define LOG_LEVEL(lvl, fmt, ...) ({ _LOG_PRINTF(fmt, ## __VA_ARGS__ ); })
+#define LOG_EMERGENCY		_LOG_PRINTF
+#define LOG_ALERT		_LOG_PRINTF
+#define LOG_CRITICAL		_LOG_PRINTF
+#define LOG_ERROR		_LOG_PRINTF
+#define LOG_WARNING		_LOG_PRINTF
+#define LOG_NOTICE		_LOG_PRINTF
+#define LOG_INFO		_LOG_PRINTF
+#define LOG_DEBUG		_LOG_PRINTF
+
+#define LOG_OKAY		_LOG_PRINTF
+#define LOG_OOPS		_LOG_PRINTF
+#define LOG_TRACE		_LOG_PRINTF
+
+#define logger_init(...)		({ 0; })
+#define logger_deinit(...)		({ 0; })
+#define logger_get_write_queue(...)	({ NULL; })
+#define logger_free_write_queue(...)	({ 0; })
+#endif // defined(LOGGER_USE_PRINTF)
+
+#if !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
+#define LOG_LEVEL(lvl, ...)		({ 0; })
+#define LOG_EMERGENCY(...)		({ 0; })
+#define LOG_ALERT(...)			({ 0; })
+#define LOG_CRITICAL(...)		({ 0; })
+#define LOG_ERROR(...)			({ 0; })
+#define LOG_WARN(...)			({ 0; })
+#define LOG_NOTICE(...)			({ 0; })
+#define LOG_INFO(...)			({ 0; })
+#define LOG_DEBUG(...)			({ 0; })
+
+#define LOG_OK(...)			({ 0; })
+#define LOG_OOPS(...)			({ 0; })
+#define LOG_TRACE(...)			({ 0; })
+
+#define logger_init(...)		({ 0; })
+#define logger_deinit(...)		({ 0; })
+#define logger_get_write_queue(...)	({ NULL; })
+#define logger_free_write_queue(...)	({ 0; })
+#endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* _LOGGER_H */

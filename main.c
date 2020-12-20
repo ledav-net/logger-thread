@@ -14,8 +14,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _GNU_SOURCE
-
 #include <pthread.h>
 #include <stdatomic.h>
 #include <unistd.h>
@@ -31,7 +29,7 @@
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
 
 // Uncomment to strip all the debug lines for this source.
-//#define fprintf
+//#define fprintf(...)
 
 typedef struct {
     unsigned long print_max;
@@ -42,30 +40,27 @@ typedef struct {
     int chances;
 } _thread_params;
 
-atomic_int thread_idx = 0;
+static atomic_int thread_idx = 0;
 
 /* Test thread */
 static void *thread_func_write(const _thread_params *thp)
 {
-    char th_name[LOGGER_MAX_THREAD_NAME_SZ];
-    int th = atomic_fetch_add(&thread_idx, 1);
+    char th[LOGGER_MAX_THREAD_NAME_SZ];
+    int	 th_idx = atomic_fetch_add(&thread_idx, 1);
 
-    snprintf(th_name, sizeof(th_name), "logger-W%02d", th);
-    pthread_setname_np(pthread_self(), th_name);
+    snprintf(th, sizeof(th), "writer-thd-%04d", th_idx);
+    pthread_setname_np(pthread_self(), th);
 
+#if defined(LOGGER_USE_THREAD)
     logger_write_queue_t *wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
     if (!wrq) {
-        fprintf(stderr, "W%02d! No queue available ! Exit !\n", th);
+        fprintf(stderr, "<%s> No queue available ! Exit !\n", th);
         return NULL;
     }
-    wrq->thread_idx = th;
-
-    int seq;
-    for (seq = 0; seq < thp->print_max; seq++) {
-        int index = wrq->wr_seq % wrq->lines_nr;
-
+#endif
+    for (int seq = 0; seq < thp->print_max; seq++) {
         if (!(rand() % thp->chances)) {
-            fprintf(stderr, "W%02d! Bad luck, waiting for %d usec\n", th, thp->uwait);
+            fprintf(stderr, "<%s> Bad luck, waiting for %d usec\n", th, thp->uwait);
             usleep(thp->uwait);
         }
         struct timespec before, after;
@@ -73,17 +68,15 @@ static void *thread_func_write(const _thread_params *thp)
 
         clock_gettime(CLOCK_MONOTONIC, &before);
 
-        if ( LOG_LEVEL(level, "W%02d %lu => %d", th, seq, index) < 0 ) {
-            fprintf(stderr, "W%02d! %d => %d **LOST** (%m)\n", th, seq, index);
+        if ( LOG_LEVEL(level, "<%s> %d", th, seq) < 0 ) {
+            fprintf(stderr, "<%s> %d **LOST** (%m)\n", th, seq);
         }
         clock_gettime(CLOCK_MONOTONIC, &after);
 
-        fprintf(stderr, "W%02d? %lu logger_printf took %lu ns (%d)\n",
-                        th, timespec_to_ns(after), elapsed_ns(before, after), index);
+        fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n",
+                        th, timespec_to_ns(after), elapsed_ns(before, after));
     }
-    logger_free_write_queue();
 
-    fprintf(stderr, "W%02d! Exit (%d/%lu lines printed/dropped)\n", th, seq, wrq->lost_total);
     return NULL;
 }
 
@@ -112,7 +105,7 @@ int main(int argc, char **argv)
                     , thp.thread_max, thp.lines_min, thp.lines_max, thp.print_max, thp.chances, thp.uwait);
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
-    logger_init(thp.thread_max * 1.5, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
+    logger_init(thp.thread_max * 1.5, 50, LOGGER_OPT_NONBLOCK|LOGGER_OPT_PRINTLOST);
     sleep(start_wait);
 
     /* Writer threads */

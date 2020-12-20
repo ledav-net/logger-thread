@@ -16,13 +16,15 @@
 #ifndef _LOGGER_THREAD_H
 #define _LOGGER_THREAD_H
 
-#define _GNU_SOURCE
-
 #include <sys/syscall.h>
 #include <linux/futex.h>
 #include <stdatomic.h>
 #include <unistd.h>
 #include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "logger.h"
 
@@ -45,6 +47,9 @@ inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
     return syscall(SYS_futex, uaddr, futex_op, val, tv);
 }
 
-extern void *	_thread_logger(void);
+extern void * _thread_logger(void);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

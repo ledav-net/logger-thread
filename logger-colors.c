@@ -14,6 +14,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#if defined(LOGGER_USE_THREAD)
+
 #include "colors.h"
 #include "logger.h"
 
@@ -48,3 +50,5 @@ const logger_line_colors_t logger_colors_default = {
     .date_lines  = C_DG,
     .thread_name = C_DW,
 };
+
+#endif

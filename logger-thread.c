@@ -14,7 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _GNU_SOURCE
+#if defined(LOGGER_USE_THREAD)
 
 #include <sys/time.h>
 #include <stdatomic.h>
@@ -49,7 +49,7 @@ typedef struct {
 } _logger_fuse_entry_t;
 
 // Uncomment to strip all the debug lines for this source.
-//#define fprintf
+//#define fprintf(...)
 
 static const char *_logger_get_date(unsigned long sec, const logger_line_colors_t *c)
 {
@@ -253,3 +253,4 @@ void *_thread_logger(void)
     fprintf(stderr, "RDR! Exit\n");
     return NULL;
 }
+#endif
