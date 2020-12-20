@@ -114,10 +114,18 @@ int			logger_init(			/* Initialize the logger manager */
 
 void			logger_deinit(void);		/* Empty the queues and free all the ressources */
 
-logger_write_queue_t *	logger_get_write_queue(		/* Get a free write queue to work with */
+int			logger_assign_write_queue(	/* Assign a queue to the calling thread */
                             int lines_max);		/* Max lines buffer (<=0 use default) */
 
 int			logger_free_write_queue(void);	/* Release the write queue for another thread */
+
+int			logger_pthread_create(		/* Create a new thread with logger queue assignment */
+                            int max_lines,		/* Lines buffer to allocte for that thread (<=0 use default) */
+                            const char *thread_name,	/* Thread name to give */
+                            pthread_t *thread,		/* See pthread_create(3) for these args */
+                            const pthread_attr_t *attr,
+                            void *(*start_routine)(void *),
+                            void *arg);
 
 int			logger_printf(			/* Print a message */
                             logger_line_level_t level,	/* Importance level of this print */
@@ -231,7 +239,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 
 #define logger_init(...)		({ 0; })
 #define logger_deinit(...)		({ 0; })
-#define logger_get_write_queue(...)	({ NULL; })
+#define logger_assign_write_queue(...)	({ NULL; })
 #define logger_free_write_queue(...)	({ 0; })
 #endif // defined(LOGGER_USE_PRINTF)
 
@@ -252,7 +260,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 
 #define logger_init(...)		({ 0; })
 #define logger_deinit(...)		({ 0; })
-#define logger_get_write_queue(...)	({ NULL; })
+#define logger_assign_write_queue(...)	({ NULL; })
 #define logger_free_write_queue(...)	({ 0; })
 #endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
 

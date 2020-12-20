@@ -15,7 +15,6 @@
  */
 
 #include <pthread.h>
-#include <stdatomic.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,24 +39,13 @@ typedef struct {
     int chances;
 } _thread_params;
 
-static atomic_int thread_idx = 0;
-
 /* Test thread */
 static void *thread_func_write(const _thread_params *thp)
 {
     char th[LOGGER_MAX_THREAD_NAME_SZ];
-    int	 th_idx = atomic_fetch_add(&thread_idx, 1);
 
-    snprintf(th, sizeof(th), "writer-thd-%04d", th_idx);
-    pthread_setname_np(pthread_self(), th);
+    pthread_getname_np(pthread_self(), th, sizeof(th));
 
-#if defined(LOGGER_USE_THREAD)
-    logger_write_queue_t *wrq = logger_get_write_queue(thp->lines_min + rand() % (thp->lines_max - thp->lines_min + 1));
-    if (!wrq) {
-        fprintf(stderr, "<%s> No queue available ! Exit !\n", th);
-        return NULL;
-    }
-#endif
     for (int seq = 0; seq < thp->print_max; seq++) {
         if (!(rand() % thp->chances)) {
             fprintf(stderr, "<%s> Bad luck, waiting for %d usec\n", th, thp->uwait);
@@ -111,9 +99,15 @@ int main(int argc, char **argv)
     /* Writer threads */
     thp.print_max >>= 2; // /4
     pthread_t tid[thp.thread_max];
+    int thread_id = 0;
+
     for (int i=0; i<4; i++) {
         for (long i=0 ; i < thp.thread_max ; i++ ) {
-            pthread_create(&tid[i], NULL, (void *)thread_func_write, (void *)&thp);
+            char name[LOGGER_MAX_THREAD_NAME_SZ];
+            int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
+
+            snprintf(name, sizeof(name), "writer-thd-%04d", thread_id++);
+            logger_pthread_create(queue_size, name, &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
         }
         for (int i=0 ; i < thp.thread_max ; i++ ) {
             pthread_join(tid[i], NULL);

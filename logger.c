@@ -36,7 +36,7 @@
 
 logger_t logger;
 
-static _Thread_local logger_write_queue_t *own_wrq = NULL; /* Local thread variable */
+static _Thread_local logger_write_queue_t *_own_wrq = NULL; /* Local thread variable */
 
 static void _logger_set_thread_name(logger_write_queue_t *wrq)
 {
@@ -80,7 +80,7 @@ int logger_init(int queues_max, int lines_max, logger_opts_t options)
     logger.theme = &logger_colors_default;
     logger.default_lines_nr = lines_max;
 
-    own_wrq = NULL;
+    _own_wrq = NULL;
 
     /* Reader thread */
     pthread_create(&logger.reader_thread, NULL, (void *)_thread_logger, NULL);
@@ -117,11 +117,11 @@ void logger_deinit(void)
     free(logger.queues);
 }
 
-logger_write_queue_t *logger_get_write_queue(int lines_max)
+int logger_assign_write_queue(int lines_max)
 {
-    if (own_wrq) {
-        /* If this is set, nothing else to do ... */
-        return own_wrq;
+    if (_own_wrq) {
+        /* If this is already set, nothing else to do ... */
+        return 0;
     }
     if (lines_max <= 0) {
         /* Caller don't want a specific size... */
@@ -160,24 +160,78 @@ retry:
         /* No free queue that fits our needs... Adding a new one. */
         fwrq = _logger_alloc_write_queue(lines_max);
         if (!fwrq) {
-            return NULL;
+            return -1;
         }
         fprintf(stderr, "<%s> New queue allocated: %d = %d x %lu bytes (%lu kb allocated)\n",
                         fwrq->thread_name, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
                         (lines_max * sizeof(logger_line_t)) >> 10);
     }
-    return own_wrq = fwrq;
+    _own_wrq = fwrq;
+    return 0;
 }
 
 int logger_free_write_queue(void)
 {
-    while (own_wrq->rd_seq != own_wrq->wr_seq) {
+    while (_own_wrq->rd_seq != _own_wrq->wr_seq) {
         /* Wait for the queue to be empty before leaving ... */
         usleep(100);
     }
-    atomic_store(&own_wrq->free, 1);
-    own_wrq = NULL;
+    atomic_store(&_own_wrq->free, 1);
+    _own_wrq = NULL;
     return 0;
+}
+
+typedef struct {
+    void *(*start_routine)(void *);
+    void   *arg;
+    int     max_lines;
+    char    thread_name[LOGGER_MAX_THREAD_NAME_SZ];
+} _thread_params;
+
+static void *_logger_pthread_wrapper(_thread_params *params)
+{
+    pthread_setname_np(pthread_self(), params->thread_name);
+    /**
+     * The name of the thread is fixed at allocation time so, the
+     * pthread_setname_np() call must occur before the assignation bellow.
+     * If there is no name specified, thread_id is used instead.
+     */
+    if (logger_assign_write_queue(params->max_lines) < 0) {
+        /**
+         * Oops!  If this happen, it could mean the limit of queues to
+         * allocate is too low !!
+         */
+        return NULL;
+    }
+    /* Let run the main thread function */
+    void *rv = params->start_routine(params->arg);
+    /**
+     * Must be called when the thread don't need it anymore.  Otherwise it
+     * will stay allocated for an unexistant thread for ever !  This is also
+     * true for the local threads forked by the domains them self.  Note
+     * also that this is not needed if the thread is not printing anything.
+     */
+    logger_free_write_queue();
+    free(params);
+
+    return rv;
+}
+
+int logger_pthread_create(int max_lines, const char *thread_name,
+    pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
+{
+    _thread_params *params = malloc(sizeof(_thread_params));
+
+    if (!params) {
+        return -1;
+    }
+    strncpy(params->thread_name, thread_name, sizeof(params->thread_name)-1);
+    params->thread_name[sizeof(params->thread_name)-1] = 0;
+    params->max_lines = max_lines;
+    params->start_routine = start_routine;
+    params->arg = arg;
+
+    return pthread_create(thread, attr, (void *)_logger_pthread_wrapper, (void *)params);
 }
 
 int logger_printf(logger_line_level_t level,
@@ -189,7 +243,7 @@ int logger_printf(logger_line_level_t level,
     if (logger.terminate) {
         return errno = ESHUTDOWN, -1;
     }
-    if (!own_wrq && !logger_get_write_queue(-1)) {
+    if (!_own_wrq && logger_assign_write_queue(-1) < 0) {
         return -1;
     }
     va_list ap;
@@ -197,36 +251,36 @@ int logger_printf(logger_line_level_t level,
     logger_line_t *l;
 
 reindex:
-    index = own_wrq->wr_seq % own_wrq->lines_nr;
-    l = &own_wrq->lines[index];
+    index = _own_wrq->wr_seq % _own_wrq->lines_nr;
+    l = &_own_wrq->lines[index];
 
     while (l->ready) {
-        fprintf(stderr, "<%s> Queue full ... (%d)\n", own_wrq->thread_name, own_wrq->queue_idx);
+        fprintf(stderr, "<%s> Queue full ... (%d)\n", _own_wrq->thread_name, _own_wrq->queue_idx);
         if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
             /* Wake-up lazy guy, there is something to do ! */
-            fprintf(stderr, "<%s> Waking up the logger ...\n", own_wrq->thread_name);
+            fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
             if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
-                fprintf(stderr, "<%s> ERROR: %m !\n", own_wrq->thread_name);
+                fprintf(stderr, "<%s> ERROR: %m !\n", _own_wrq->thread_name);
                 return -1;
             }
             usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
             continue;
         }
         if (logger.options & LOGGER_OPT_NONBLOCK) {
-            own_wrq->lost++;
-            fprintf(stderr, "<%s> Line dropped (%lu %s) !\n", own_wrq->thread_name, own_wrq->lost,
+            _own_wrq->lost++;
+            fprintf(stderr, "<%s> Line dropped (%lu %s) !\n", _own_wrq->thread_name, _own_wrq->lost,
                     logger.options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
         usleep(50);
     }
-    if (own_wrq->lost && logger.options & LOGGER_OPT_PRINTLOST) {
-        int lost = own_wrq->lost;
-        own_wrq->lost_total += lost;
-        own_wrq->lost = 0;
+    if (_own_wrq->lost && logger.options & LOGGER_OPT_PRINTLOST) {
+        int lost = _own_wrq->lost;
+        _own_wrq->lost_total += lost;
+        _own_wrq->lost = 0;
 
         logger_printf(LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__,
-            "Lost %d log line(s) (%d so far) !", lost, own_wrq->lost_total);
+            "Lost %d log line(s) (%d so far) !", lost, _own_wrq->lost_total);
 
         goto reindex;
     }
@@ -239,14 +293,14 @@ reindex:
     l->line = line;
     vsnprintf(l->str, sizeof(l->str), format, ap);
 
-    fprintf(stderr, "<%s> '%s' (%d)\n", own_wrq->thread_name, l->str, own_wrq->queue_idx);
+    fprintf(stderr, "<%s> '%s' (%d)\n", _own_wrq->thread_name, l->str, _own_wrq->queue_idx);
 
     l->ready = true;
-    own_wrq->wr_seq++;
+    _own_wrq->wr_seq++;
 
     if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
         /* Wake-up lazy guy, there is something to do ! */
-        fprintf(stderr, "<%s> Waking up the logger ...\n", own_wrq->thread_name);
+        fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
         if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
             return -1;
         }
