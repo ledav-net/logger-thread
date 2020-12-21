@@ -224,7 +224,9 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define _LOG_PRINTF(fmt, ...) \
         printf("%s: %s: (%d) " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__)
 
-#define LOG_LEVEL(lvl, fmt, ...) ({ _LOG_PRINTF(fmt, ## __VA_ARGS__ ); })
+#define LOG_LEVEL(lvl, fmt, ...) ({ \
+        (void)(lvl); _LOG_PRINTF(fmt, ## __VA_ARGS__ ); \
+})
 #define LOG_EMERGENCY		_LOG_PRINTF
 #define LOG_ALERT		_LOG_PRINTF
 #define LOG_CRITICAL		_LOG_PRINTF
@@ -233,38 +235,43 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define LOG_NOTICE		_LOG_PRINTF
 #define LOG_INFO		_LOG_PRINTF
 #define LOG_DEBUG		_LOG_PRINTF
-
 #define LOG_OKAY		_LOG_PRINTF
 #define LOG_OOPS		_LOG_PRINTF
 #define LOG_TRACE		_LOG_PRINTF
 
-#define logger_init(...)		({ 0; })
-#define logger_deinit(...)		({ 0; })
-#define logger_assign_write_queue(...)	({ NULL; })
-#define logger_free_write_queue(...)	({ 0; })
-#define logger_pthread_create(a, b, ...) pthread_create(## __VA_ARGS_)
+#define logger_init(...)		({ ; })
+#define logger_deinit(...)		({ ; })
+#define logger_assign_write_queue(...)	({ ; })
+#define logger_free_write_queue(...)	({ ; })
+
+#define logger_pthread_create(a, b, c, d, e, f) ({ \
+            (void)(a); (void)(b); pthread_create(c, d, e, f); \
+})
 #endif // defined(LOGGER_USE_PRINTF)
 
 #if !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
-#define LOG_LEVEL(lvl, ...)		({ 0; })
-#define LOG_EMERGENCY(...)		({ 0; })
-#define LOG_ALERT(...)			({ 0; })
-#define LOG_CRITICAL(...)		({ 0; })
-#define LOG_ERROR(...)			({ 0; })
-#define LOG_WARN(...)			({ 0; })
-#define LOG_NOTICE(...)			({ 0; })
-#define LOG_INFO(...)			({ 0; })
-#define LOG_DEBUG(...)			({ 0; })
 
-#define LOG_OK(...)			({ 0; })
-#define LOG_OOPS(...)			({ 0; })
-#define LOG_TRACE(...)			({ 0; })
+#define LOG_LEVEL(lvl, ...)	({ (void)(lvl); 0; })
+#define LOG_EMERGENCY(...)	({ ; })
+#define LOG_ALERT(...)		({ ; })
+#define LOG_CRITICAL(...)	({ ; })
+#define LOG_ERROR(...)		({ ; })
+#define LOG_WARN(...)		({ ; })
+#define LOG_NOTICE(...)		({ ; })
+#define LOG_INFO(...)		({ ; })
+#define LOG_DEBUG(...)		({ ; })
+#define LOG_OK(...)		({ ; })
+#define LOG_OOPS(...)		({ ; })
+#define LOG_TRACE(...)		({ ; })
 
-#define logger_init(...)		({ 0; })
-#define logger_deinit(...)		({ 0; })
-#define logger_assign_write_queue(...)	({ NULL; })
-#define logger_free_write_queue(...)	({ 0; })
-#define logger_pthread_create(a, b, ...) pthread_create(## __VA_ARGS_)
+#define logger_init(...)		({ ; })
+#define logger_deinit(...)		({ ; })
+#define logger_assign_write_queue(...)	({ ; })
+#define logger_free_write_queue(...)	({ ; })
+
+#define logger_pthread_create(a, b, c, d, e, f) ({ \
+            (void)(a); (void)(b); pthread_create(c, d, e, f); \
+})
 #endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
 
 #ifdef __cplusplus
