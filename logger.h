@@ -120,8 +120,8 @@ int			logger_assign_write_queue(	/* Assign a queue to the calling thread */
 int			logger_free_write_queue(void);	/* Release the write queue for another thread */
 
 int			logger_pthread_create(		/* Create a new thread with logger queue assignment */
-                            int max_lines,		/* Lines buffer to allocte for that thread (<=0 use default) */
                             const char *thread_name,	/* Thread name to give */
+                            int max_lines,		/* Lines buffer to allocte for that thread (<=0 use default) */
                             pthread_t *thread,		/* See pthread_create(3) for these args */
                             const pthread_attr_t *attr,
                             void *(*start_routine)(void *),

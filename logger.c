@@ -217,7 +217,7 @@ static void *_logger_pthread_wrapper(_thread_params *params)
     return rv;
 }
 
-int logger_pthread_create(int max_lines, const char *thread_name,
+int logger_pthread_create(const char *thread_name, int max_lines,
     pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
 {
     _thread_params *params = malloc(sizeof(_thread_params));
