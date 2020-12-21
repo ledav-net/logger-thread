@@ -101,15 +101,20 @@ static int _logger_write_line(const logger_write_queue_t *wrq, const logger_line
     unsigned long usec = NTOU(l->ts.tv_nsec) % 1000;
     unsigned long msec = NTOM(l->ts.tv_nsec) % 1000;
     int sec            = l->ts.tv_sec % 60;
+
     /* Format all together */
-    len = snprintf(linestr, sizeof(linestr),
+    static int biggest_thread_name = 0;
+    if (wrq->thread_name_len > biggest_thread_name) {
+        biggest_thread_name = wrq->thread_name_len;
+    }
+    len = sprintf(linestr,
             "%s%s:%02d.%03lu,%03lu [%s%s%s] %*s <%s%*s%s> %s\n",
             _logger_get_date(l->ts.tv_sec, c),
             _logger_get_time(l->ts.tv_sec, c),
             sec, msec, usec,
             c->level[l->level], _logger_level_label[l->level], c->reset,
             LOGGER_MAX_SOURCE_LEN, start_of_src_str,
-            c->thread_name, (int)sizeof(wrq->thread_name)-1, wrq->thread_name, c->reset, l->str);
+            c->thread_name, biggest_thread_name, wrq->thread_name, c->reset, l->str);
     /* Print */
     return write(1, linestr, len);
 }

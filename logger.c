@@ -45,6 +45,7 @@ static void _logger_set_thread_name(logger_write_queue_t *wrq)
     if (!wrq->thread_name[0]) {
         snprintf(wrq->thread_name, LOGGER_MAX_THREAD_NAME_SZ, "%lu", wrq->thread);
     }
+    wrq->thread_name_len = strlen(wrq->thread_name);
 }
 
 logger_write_queue_t *_logger_alloc_write_queue(int lines_max)

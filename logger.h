@@ -81,6 +81,7 @@ typedef struct {
     atomic_int		free;			/* True (1) if this queue is not used */
     pthread_t		thread;			/* Thread owning this queue */
     char		thread_name[LOGGER_MAX_THREAD_NAME_SZ]; /* Thread name */
+    int			thread_name_len;	/* Length of the thread name */
 } logger_write_queue_t;
 
 typedef struct {
