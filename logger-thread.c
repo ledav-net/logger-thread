@@ -226,12 +226,16 @@ void *_thread_logger(void)
                     terminate = true;
                     break; // while (1)
                 }
-                if (really_empty < 5) {
-                    int wait = 32 << really_empty++;
+                if (really_empty < 10) {
+                    int wait = 1 << really_empty++;
                     fprintf(stderr, "RDR! Print queue empty. Double check in %d us ...\n", wait);
                     usleep(wait);
-                    /* Double-check (5 times) if the queue is really empty for ~1ms */
-                    /* This avoid the writers to wakeup too frequently the reader in case of burst */
+                    /**
+                     * Double-check multiple times if the queue is really empty for ~1ms.
+                     * This is avoid the writers to wakeup too frequently the reader in case of burst.
+                     * Waking him up through the futex also takes time and the goal is to lower the
+                     * time spent in logger_printf() as much as possible ...
+                     */
                     continue;
                 }
                 really_empty = 0;
