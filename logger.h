@@ -242,6 +242,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define logger_deinit(...)		({ 0; })
 #define logger_assign_write_queue(...)	({ NULL; })
 #define logger_free_write_queue(...)	({ 0; })
+#define logger_pthread_create(a, b, ...) pthread_create(## __VA_ARGS_)
 #endif // defined(LOGGER_USE_PRINTF)
 
 #if !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
@@ -263,6 +264,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define logger_deinit(...)		({ 0; })
 #define logger_assign_write_queue(...)	({ NULL; })
 #define logger_free_write_queue(...)	({ 0; })
+#define logger_pthread_create(a, b, ...) pthread_create(## __VA_ARGS_)
 #endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
 
 #ifdef __cplusplus
