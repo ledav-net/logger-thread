@@ -173,6 +173,7 @@ retry:
 
 int logger_free_write_queue(void)
 {
+    fprintf(stderr, "<%s> Freeing queue %d ...\n", _own_wrq->thread_name, _own_wrq->queue_idx);
     while (_own_wrq->rd_seq != _own_wrq->wr_seq) {
         /* Wait for the queue to be empty before leaving ... */
         usleep(100);
@@ -189,8 +190,10 @@ typedef struct {
     char    thread_name[LOGGER_MAX_THREAD_NAME_SZ];
 } _thread_params;
 
-static void *_logger_pthread_wrapper(_thread_params *params)
+static void _logger_pthread_wrapper(_thread_params *params)
 {
+    pthread_cleanup_push((void *)free, (void *)params);
+
     pthread_setname_np(pthread_self(), params->thread_name);
     /**
      * The name of the thread is fixed at allocation time so, the
@@ -202,20 +205,25 @@ static void *_logger_pthread_wrapper(_thread_params *params)
          * Oops!  If this happen, it could mean the limit of queues to
          * allocate is too low !!
          */
-        return NULL;
+        pthread_exit(NULL);
     }
-    /* Let run the main thread function */
-    void *rv = params->start_routine(params->arg);
     /**
      * Must be called when the thread don't need it anymore.  Otherwise it
      * will stay allocated for an unexistant thread for ever !  This is also
-     * true for the local threads forked by the domains them self.  Note
-     * also that this is not needed if the thread is not printing anything.
+     * true for the local threads forked by the domains themself.
+     *
+     * Note also that if this thread never print something, you should NOT
+     * use this wrapper but better use the native pthread_create(3) instead
+     * as all this is useless and reserve a log queue for nothing ...
      */
-    logger_free_write_queue();
-    free(params);
+    pthread_cleanup_push((void *)logger_free_write_queue, NULL);
 
-    return rv;
+    /* Let run the main thread function */
+    pthread_exit(params->start_routine(params->arg));
+
+    /* I know this sounds weird but it's the way it is... pushs needs pops ! */
+    pthread_cleanup_pop(true);
+    pthread_cleanup_pop(true);
 }
 
 int logger_pthread_create(const char *thread_name, int max_lines,
