@@ -192,7 +192,7 @@ void *_thread_logger(void)
 {
     bool terminate = logger.terminate;
 
-    fprintf(stderr, "RDR! Starting...\n");
+    fprintf(stderr, "<logger-thd-read> Starting...\n");
 
     while (!terminate) {
         int empty_nr = 0;
@@ -200,17 +200,17 @@ void *_thread_logger(void)
         int fuse_nr = logger.queues_nr;
 
         if (!fuse_nr) {
-            fprintf(stderr, "RDR! Wake me up when there is somet'n... Zzz\n");
+            fprintf(stderr, "<logger-thd-read> Wake me up when there is somet'n... Zzz\n");
             atomic_store(&logger.waiting, 1);
             if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
-                    fprintf(stderr, "RDR! ERROR: %m !\n");
+                    fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
                     break;
             }
             continue;
         }
         _logger_fuse_entry_t fuse_queue[fuse_nr];
 
-        fprintf(stderr, "RDR! (re)loading... _logger_fuse_entry_t = %d x %lu bytes (%lu bytes total)\n",
+        fprintf(stderr, "<logger-thd-read> (Re)Loading... _logger_fuse_entry_t = %d x %lu bytes (%lu bytes total)\n",
                         fuse_nr, sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
 
         empty_nr = _logger_init_lines_queue(fuse_queue, fuse_nr);
@@ -230,7 +230,7 @@ void *_thread_logger(void)
                 }
                 if (really_empty < 10) {
                     int wait = 1 << really_empty++;
-                    fprintf(stderr, "RDR! Print queue empty. Double check in %d us ...\n", wait);
+                    fprintf(stderr, "<logger-thd-read> Print queue empty. Double check in %d us ...\n", wait);
                     usleep(wait);
                     /**
                      * Double-check multiple times if the queue is really empty for ~1ms.
@@ -241,10 +241,10 @@ void *_thread_logger(void)
                     continue;
                 }
                 really_empty = 0;
-                fprintf(stderr, "RDR! Print queue REALLY empty ... Zzz\n");
+                fprintf(stderr, "<logger-thd-read> Print queue REALLY empty ... Zzz\n");
                 atomic_store(&logger.waiting, 1);
                 if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
-                    fprintf(stderr, "RDR! ERROR: %m !\n");
+                    fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
                     terminate = true;
                     break;
                 }
@@ -256,12 +256,12 @@ void *_thread_logger(void)
             logger_write_queue_t *wrq = fuse_queue[0].wrq;
             int rv = _logger_write_line(wrq, &wrq->lines[wrq->rd_idx]);
             if (rv < 0) {
-                fprintf(stderr, "RDR: logger_write_line(): %m\n");
+                fprintf(stderr, "<logger-thd-read> logger_write_line(): %m\n");
                 break;
             }
         }
     }
-    fprintf(stderr, "RDR! Exit\n");
+    fprintf(stderr, "<logger-thd-read> Exit\n");
     return NULL;
 }
 #endif
