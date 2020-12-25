@@ -107,7 +107,8 @@ int main(int argc, char **argv)
             int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
 
             snprintf(name, sizeof(name), "writer-thd-%04d", thread_id++);
-            logger_pthread_create(name, queue_size, &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
+            logger_pthread_create(name, queue_size, LOGGER_OPT_NONE,
+                                  &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
         }
         for (int i=0 ; i < thp.thread_max ; i++ ) {
             pthread_join(tid[i], NULL);

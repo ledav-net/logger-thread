@@ -73,6 +73,7 @@ typedef struct {
     logger_line_t	*lines;			/* Lines buffer */
     int			lines_nr;		/* Maximum number of buffered lines for this thread */
     int			queue_idx;		/* Index of the queue */
+    logger_opts_t	opts;			/* Options for this queue. Set to default if not precised */
     unsigned int	rd_idx;			/* Actual read index */
     unsigned long	rd_seq;			/* Read sequence */
     unsigned long	wr_seq;			/* Write sequence */
@@ -100,7 +101,7 @@ typedef struct {
     int				default_lines_nr;	/* Default number of lines max / buffer to use */
     bool		 	terminate;		/* Set to true when the reader thread has to finish */
     bool		 	empty;			/* Set to true when all the queues are empty */
-    logger_opts_t	 	options;		/* Logger options */
+    logger_opts_t	 	opts;			/* Default logger options. Some can be fine tuned by write queue */
     atomic_int		 	reload;			/* True (1) when new queue(s) are added */
     atomic_int		 	waiting;		/* True (1) if the reader-thread is sleeping ... */
     pthread_t		 	reader_thread;		/* TID of the reader thread */
@@ -116,13 +117,15 @@ int			logger_init(			/* Initialize the logger manager */
 void			logger_deinit(void);		/* Empty the queues and free all the ressources */
 
 int			logger_assign_write_queue(	/* Assign a queue to the calling thread */
-                            int lines_max);		/* Max lines buffer (<=0 use default) */
+                            unsigned int lines_max,	/* Max lines buffer (=0 use default) */
+                            logger_opts_t opts);	/* If not precised, use the logger's options */
 
 int			logger_free_write_queue(void);	/* Release the write queue for another thread */
 
 int			logger_pthread_create(		/* Create a new thread with logger queue assignment */
                             const char *thread_name,	/* Thread name to give */
-                            int max_lines,		/* Lines buffer to allocte for that thread (<=0 use default) */
+                            unsigned int max_lines,	/* Lines buffer to allocte for that thread (=0 use default) */
+                            logger_opts_t opts,		/* Options to used for this queue. (=0 use default) */
                             pthread_t *thread,		/* See pthread_create(3) for these args */
                             const pthread_attr_t *attr,
                             void *(*start_routine)(void *),
@@ -244,8 +247,8 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define logger_assign_write_queue(...)	({ ; })
 #define logger_free_write_queue(...)	({ ; })
 
-#define logger_pthread_create(a, b, c, d, e, f) ({ \
-            (void)(a); (void)(b); pthread_create(c, d, e, f); \
+#define logger_pthread_create(a, b, c, d, e, f, g) ({ \
+            (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
 })
 #endif // defined(LOGGER_USE_PRINTF)
 
@@ -269,8 +272,8 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define logger_assign_write_queue(...)	({ ; })
 #define logger_free_write_queue(...)	({ ; })
 
-#define logger_pthread_create(a, b, c, d, e, f) ({ \
-            (void)(a); (void)(b); pthread_create(c, d, e, f); \
+#define logger_pthread_create(a, b, c, d, e, f, g) ({ \
+            (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
 })
 #endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
 

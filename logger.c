@@ -69,7 +69,7 @@ logger_write_queue_t *_logger_alloc_write_queue(int lines_max)
     return wrq;
 }
 
-int logger_init(int queues_max, int lines_max, logger_opts_t options)
+int logger_init(int queues_max, int lines_max, logger_opts_t opts)
 {
     memset(&logger, 0, sizeof(logger_t));
 
@@ -77,7 +77,7 @@ int logger_init(int queues_max, int lines_max, logger_opts_t options)
 
     logger.queues = calloc(queues_max, sizeof(logger_write_queue_t *));
     logger.queues_max = queues_max;
-    logger.options = options;
+    logger.opts = opts;
     logger.theme = &logger_colors_default;
     logger.default_lines_nr = lines_max;
 
@@ -118,13 +118,13 @@ void logger_deinit(void)
     free(logger.queues);
 }
 
-int logger_assign_write_queue(int lines_max)
+int logger_assign_write_queue(unsigned int lines_max, logger_opts_t opts)
 {
     if (_own_wrq) {
         /* If this is already set, nothing else to do ... */
         return 0;
     }
-    if (lines_max <= 0) {
+    if (!lines_max) {
         /* Caller don't want a specific size... */
         lines_max = logger.default_lines_nr;
     }
@@ -167,6 +167,7 @@ retry:
                         fwrq->thread_name, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
                         (lines_max * sizeof(logger_line_t)) >> 10);
     }
+    fwrq->opts = opts ?: logger.opts;
     _own_wrq = fwrq;
     return 0;
 }
@@ -184,10 +185,11 @@ int logger_free_write_queue(void)
 }
 
 typedef struct {
-    void *(*start_routine)(void *);
-    void   *arg;
-    int     max_lines;
-    char    thread_name[LOGGER_MAX_THREAD_NAME_SZ];
+    void       *(*start_routine)(void *);
+    void         *arg;
+    int           max_lines;
+    logger_opts_t opts;
+    char          thread_name[LOGGER_MAX_THREAD_NAME_SZ];
 } _thread_params;
 
 static void _logger_pthread_wrapper(_thread_params *params)
@@ -200,7 +202,7 @@ static void _logger_pthread_wrapper(_thread_params *params)
      * pthread_setname_np() call must occur before the assignation bellow.
      * If there is no name specified, thread_id is used instead.
      */
-    if (logger_assign_write_queue(params->max_lines) < 0) {
+    if (logger_assign_write_queue(params->max_lines, params->opts) < 0) {
         /**
          * Oops!  If this happen, it could mean the limit of queues to
          * allocate is too low !!
@@ -226,7 +228,7 @@ static void _logger_pthread_wrapper(_thread_params *params)
     pthread_cleanup_pop(true);
 }
 
-int logger_pthread_create(const char *thread_name, int max_lines,
+int logger_pthread_create(const char *thread_name, unsigned int max_lines, logger_opts_t opts,
     pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
 {
     _thread_params *params = malloc(sizeof(_thread_params));
@@ -237,6 +239,7 @@ int logger_pthread_create(const char *thread_name, int max_lines,
     strncpy(params->thread_name, thread_name, sizeof(params->thread_name)-1);
     params->thread_name[sizeof(params->thread_name)-1] = 0;
     params->max_lines = max_lines;
+    params->opts = opts;
     params->start_routine = start_routine;
     params->arg = arg;
 
@@ -252,7 +255,7 @@ int logger_printf(logger_line_level_t level,
     if (logger.terminate) {
         return errno = ESHUTDOWN, -1;
     }
-    if (!_own_wrq && logger_assign_write_queue(-1) < 0) {
+    if (!_own_wrq && logger_assign_write_queue(0, LOGGER_OPT_NONE) < 0) {
         return -1;
     }
     va_list ap;
@@ -275,15 +278,15 @@ reindex:
             usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
             continue;
         }
-        if (logger.options & LOGGER_OPT_NONBLOCK) {
+        if (_own_wrq->opts & LOGGER_OPT_NONBLOCK) {
             _own_wrq->lost++;
             fprintf(stderr, "<%s> Line dropped (%lu %s) !\n", _own_wrq->thread_name, _own_wrq->lost,
-                    logger.options & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
+                    _own_wrq->opts & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
         usleep(50);
     }
-    if (_own_wrq->lost && logger.options & LOGGER_OPT_PRINTLOST) {
+    if (_own_wrq->lost && _own_wrq->opts & LOGGER_OPT_PRINTLOST) {
         int lost = _own_wrq->lost;
         _own_wrq->lost_total += lost;
         _own_wrq->lost = 0;
