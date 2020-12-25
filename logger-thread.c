@@ -54,16 +54,17 @@ typedef struct {
 static const char *_logger_get_date(unsigned long sec, const logger_line_colors_t *c)
 {
     static char date[64];
-    static unsigned long prev_sec = 0;
+    static unsigned long prev_day = 0;
+    unsigned long day = (sec - timezone) / (60 * 60 * 24); // 1 day in seconds
 
-    if (sec - prev_sec >= 60*60*24) {
+    if (day != prev_day) {
         char tmp[16];
         struct tm tm;
         localtime_r((const time_t *)&sec, &tm);
         strftime(tmp, sizeof(tmp), "%Y-%m-%d", &tm);
         sprintf(date, "%s-- %s%s%s --%s\n",
                     c->date_lines, c->date, tmp, c->date_lines, c->reset);
-        prev_sec = sec;
+        prev_day = day;
         return date;
     }
     return "";
@@ -72,15 +73,16 @@ static const char *_logger_get_date(unsigned long sec, const logger_line_colors_
 static const char *_logger_get_time(unsigned long sec, const logger_line_colors_t *c)
 {
     static char time[32];
-    static unsigned long prev_sec = 0;
+    static unsigned long prev_min = 0;
+    unsigned long min = sec / 60;
 
-    if (sec - prev_sec >= 60) {
+    if (min != prev_min) {
         char tmp[8];
         struct tm tm;
         localtime_r((const time_t *)&sec, &tm);
         strftime(tmp, sizeof(tmp), "%H:%M", &tm);
         sprintf(time, "%s%s%s", c->time, tmp, c->reset);
-        prev_sec = sec;
+        prev_min = min;
     }
     return time;
 }
