@@ -242,10 +242,10 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define LOG_OOPS		_LOG_PRINTF
 #define LOG_TRACE		_LOG_PRINTF
 
-#define logger_init(...)		({ ; })
-#define logger_deinit(...)		({ ; })
-#define logger_assign_write_queue(...)	({ ; })
-#define logger_free_write_queue(...)	({ ; })
+#define logger_init(...)		({ (void)0; })
+#define logger_deinit(...)		({ (void)0; })
+#define logger_assign_write_queue(...)	({ (void)0; })
+#define logger_free_write_queue(...)	({ (void)0; })
 
 #define logger_pthread_create(a, b, c, d, e, f, g) ({ \
             (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
@@ -254,23 +254,23 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 
 #if !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
 
-#define LOG_LEVEL(lvl, ...)	({ (void)(lvl); 0; })
-#define LOG_EMERGENCY(...)	({ ; })
-#define LOG_ALERT(...)		({ ; })
-#define LOG_CRITICAL(...)	({ ; })
-#define LOG_ERROR(...)		({ ; })
-#define LOG_WARN(...)		({ ; })
-#define LOG_NOTICE(...)		({ ; })
-#define LOG_INFO(...)		({ ; })
-#define LOG_DEBUG(...)		({ ; })
-#define LOG_OK(...)		({ ; })
-#define LOG_OOPS(...)		({ ; })
-#define LOG_TRACE(...)		({ ; })
+#define LOG_LEVEL(lvl, ...)	({ (void)(lvl); (void)0; })
+#define LOG_EMERGENCY(...)	({ (void)0; })
+#define LOG_ALERT(...)		({ (void)0; })
+#define LOG_CRITICAL(...)	({ (void)0; })
+#define LOG_ERROR(...)		({ (void)0; })
+#define LOG_WARN(...)		({ (void)0; })
+#define LOG_NOTICE(...)		({ (void)0; })
+#define LOG_INFO(...)		({ (void)0; })
+#define LOG_DEBUG(...)		({ (void)0; })
+#define LOG_OK(...)		({ (void)0; })
+#define LOG_OOPS(...)		({ (void)0; })
+#define LOG_TRACE(...)		({ (void)0; })
 
-#define logger_init(...)		({ ; })
-#define logger_deinit(...)		({ ; })
-#define logger_assign_write_queue(...)	({ ; })
-#define logger_free_write_queue(...)	({ ; })
+#define logger_init(...)		({ (void)0; })
+#define logger_deinit(...)		({ (void)0; })
+#define logger_assign_write_queue(...)	({ (void)0; })
+#define logger_free_write_queue(...)	({ (void)0; })
 
 #define logger_pthread_create(a, b, c, d, e, f, g) ({ \
             (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
