@@ -190,11 +190,11 @@ static inline int _logger_init_lines_queue(_logger_fuse_entry_t *fuse, int fuse_
 
 void *_thread_logger(void)
 {
-    bool terminate = logger.terminate;
+    bool running = logger.running;
 
     fprintf(stderr, "<logger-thd-read> Starting...\n");
 
-    while (!terminate) {
+    while (running) {
         int empty_nr = 0;
         int really_empty = 0;
         int fuse_nr = logger.queues_nr;
@@ -223,17 +223,17 @@ void *_thread_logger(void)
             }
             if (fuse_queue[0].ts == ~0) {
                 logger.empty = true;
-                if (logger.terminate) {
+                if (!logger.running) {
                     /* We want to terminate when all the queues are empty ! */
-                    terminate = true;
+                    running = false;
                     break; // while (1)
                 }
-                if (really_empty < 10) {
+                if (really_empty < 5) {
                     int wait = 1 << really_empty++;
                     fprintf(stderr, "<logger-thd-read> Print queue empty. Double check in %d us ...\n", wait);
                     usleep(wait);
                     /**
-                     * Double-check multiple times if the queue is really empty for ~1ms.
+                     * Double-check multiple times if the queue is really empty.
                      * This is avoid the writers to wakeup too frequently the reader in case of burst.
                      * Waking him up through the futex also takes time and the goal is to lower the
                      * time spent in logger_printf() as much as possible ...
@@ -245,7 +245,7 @@ void *_thread_logger(void)
                 atomic_store(&logger.waiting, 1);
                 if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
                     fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
-                    terminate = true;
+                    running = false;
                     break;
                 }
                 continue;

@@ -80,6 +80,7 @@ int logger_init(int queues_max, int lines_max, logger_opts_t opts)
     logger.opts = opts;
     logger.theme = &logger_colors_default;
     logger.default_lines_nr = lines_max;
+    logger.running = true;
 
     _own_wrq = NULL;
 
@@ -96,7 +97,7 @@ void logger_deinit(void)
         fprintf(stderr, "Waiting for logger ...\n");
         usleep(100);
     }
-    logger.terminate = true;
+    logger.running = false;
     atomic_store(&logger.waiting, 0);
     int r = futex_wake(&logger.waiting, 1);
     if (r <= 0) {
@@ -116,6 +117,7 @@ void logger_deinit(void)
         free(logger.queues[i]);
     }
     free(logger.queues);
+    memset(&logger, 0, sizeof(logger_t));
 }
 
 int logger_assign_write_queue(unsigned int lines_max, logger_opts_t opts)
@@ -252,8 +254,8 @@ int logger_printf(logger_line_level_t level,
         unsigned int line,
         const char *format, ...)
 {
-    if (logger.terminate) {
-        return errno = ESHUTDOWN, -1;
+    if (!logger.running) {
+        return errno = ENOTCONN, -1;
     }
     if (!_own_wrq && logger_assign_write_queue(0, LOGGER_OPT_NONE) < 0) {
         return -1;

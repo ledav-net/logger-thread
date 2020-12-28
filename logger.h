@@ -99,7 +99,7 @@ typedef struct {
     int			 	queues_nr;		/* Number of queues allocated */
     int			 	queues_max;		/* Maximum number of possible queues */
     int				default_lines_nr;	/* Default number of lines max / buffer to use */
-    bool		 	terminate;		/* Set to true when the reader thread has to finish */
+    bool		 	running;		/* Set to true when the reader thread is running */
     bool		 	empty;			/* Set to true when all the queues are empty */
     logger_opts_t	 	opts;			/* Default logger options. Some can be fine tuned by write queue */
     atomic_int		 	reload;			/* True (1) when new queue(s) are added */
