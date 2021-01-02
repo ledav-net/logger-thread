@@ -209,6 +209,7 @@ void *_thread_logger(void)
             if (!logger.running) {
                 break;
             }
+            atomic_store(&logger.reload, 0);
             continue;
         }
         _logger_fuse_entry_t fuse_queue[fuse_nr];
