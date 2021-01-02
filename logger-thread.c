@@ -203,8 +203,11 @@ void *_thread_logger(void)
             fprintf(stderr, "<logger-thd-read> Wake me up when there is somet'n... Zzz\n");
             atomic_store(&logger.waiting, 1);
             if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
-                    fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
-                    break;
+                fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
+                break;
+            }
+            if (!logger.running) {
+                break;
             }
             continue;
         }
