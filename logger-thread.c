@@ -261,7 +261,11 @@ void *_thread_logger(void)
             int rv = _logger_write_line(wrq, &wrq->lines[wrq->rd_idx]);
             if (rv < 0) {
                 fprintf(stderr, "<logger-thd-read> logger_write_line(): %m\n");
-                break;
+                /**
+                 * In this case we loose the line but we continue to empty the queues ...
+                 * otherwise all the queues gets full and all the threads are stuck on it
+                 * (this can happen if the disk is full ...)
+                 */
             }
         }
     }
