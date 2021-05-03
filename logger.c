@@ -174,10 +174,25 @@ retry:
     return 0;
 }
 
+static inline int _logger_wakeup_reader_if_needed(void)
+{
+    if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
+        /* Wake-up lazy guy, there is something to do ! */
+        fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
+        if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int logger_free_write_queue(void)
 {
     fprintf(stderr, "<%s> Freeing queue %d ...\n", _own_wrq->thread_name, _own_wrq->queue_idx);
     while (_own_wrq->rd_seq != _own_wrq->wr_seq) {
+        if (_logger_wakeup_reader_if_needed() < 0) {
+            return -1;
+        }
         /* Wait for the queue to be empty before leaving ... */
         usleep(100);
     }
@@ -271,10 +286,7 @@ reindex:
     while (l->ready) {
         fprintf(stderr, "<%s> Queue full ... (%d)\n", _own_wrq->thread_name, _own_wrq->queue_idx);
         if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
-            /* Wake-up lazy guy, there is something to do ! */
-            fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
-            if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
-                fprintf(stderr, "<%s> ERROR: %m !\n", _own_wrq->thread_name);
+            if (_logger_wakeup_reader_if_needed() < 0) {
                 return -1;
             }
             usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
@@ -312,14 +324,7 @@ reindex:
     l->ready = true;
     _own_wrq->wr_seq++;
 
-    if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
-        /* Wake-up lazy guy, there is something to do ! */
-        fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
-        if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
-            return -1;
-        }
-    }
-    return 0;
+    return _logger_wakeup_reader_if_needed();
 }
 
 #endif
