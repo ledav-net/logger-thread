@@ -32,7 +32,7 @@
 #include "logger-thread.h"
 
 // Uncomment to strip all the debug lines for this source.
-//#define fprintf(...)
+#define fprintf(...)
 
 logger_t logger;
 
