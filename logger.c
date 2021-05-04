@@ -182,6 +182,7 @@ static inline int _logger_wakeup_reader_if_needed(void)
         if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
             return -1;
         }
+        return 1;
     }
     return 0;
 }
@@ -285,12 +286,14 @@ reindex:
 
     while (l->ready) {
         fprintf(stderr, "<%s> Queue full ... (%d)\n", _own_wrq->thread_name, _own_wrq->queue_idx);
-        if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
-            if (_logger_wakeup_reader_if_needed() < 0) {
-                return -1;
-            }
+
+        int ret = _logger_wakeup_reader_if_needed();
+        if (ret > 0) {
             usleep(1); // Let a chance to the logger to empty at least a cell before giving up...
             continue;
+        }
+        else if (ret < 0) {
+            return -1;
         }
         if (_own_wrq->opts & LOGGER_OPT_NONBLOCK) {
             _own_wrq->lost++;
@@ -324,7 +327,10 @@ reindex:
     l->ready = true;
     _own_wrq->wr_seq++;
 
-    return _logger_wakeup_reader_if_needed();
+    if (_logger_wakeup_reader_if_needed() < 0) {
+        return -1;
+    }
+    return 0;
 }
 
 #endif
