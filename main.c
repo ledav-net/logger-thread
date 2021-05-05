@@ -57,11 +57,12 @@ static void *thread_func_write(const _thread_params *thp)
         int level = rand() % LOGGER_LEVEL_COUNT;
 
         clock_gettime(CLOCK_MONOTONIC, &before);
-
         if ( LOG_LEVEL(level, "<%s> %d", th, seq) < 0 ) {
+            clock_gettime(CLOCK_MONOTONIC, &after);
             fprintf(stderr, "<%s> %d **LOST** (%m)\n", th, seq);
+        } else {
+            clock_gettime(CLOCK_MONOTONIC, &after);
         }
-        clock_gettime(CLOCK_MONOTONIC, &after);
 
         fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n",
                         th, timespec_to_ns(after), elapsed_ns(before, after));
