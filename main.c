@@ -111,6 +111,12 @@ int main(int argc, char **argv)
                     , thp.opts & LOGGER_OPT_PRINTLOST ? "+printlost"   : "");
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
+    struct timespec before, after;
+    clock_gettime(CLOCK_MONOTONIC, &before);
+    fprintf(stderr, "For reference, the call to fprintf(stderr,...) to print this line took: ");
+    clock_gettime(CLOCK_MONOTONIC, &after);
+    fprintf(stderr, "%lu ns\n\n", elapsed_ns(before, after));
+
     logger_init(thp.thread_max * 1.5, 50, 0);
     sleep(start_wait);
 
