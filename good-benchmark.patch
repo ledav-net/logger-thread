@@ -1,0 +1,44 @@
+diff --git a/logger-thread.c b/logger-thread.c
+index 579f53d..7a65d23 100644
+--- a/logger-thread.c
++++ b/logger-thread.c
+@@ -49,7 +49,7 @@ typedef struct {
+ } _logger_fuse_entry_t;
+ 
+ // Uncomment to strip all the debug lines for this source.
+-//#define fprintf(...)
++#define fprintf(...)
+ 
+ static const char *_logger_get_date(unsigned long sec, const logger_line_colors_t *c)
+ {
+diff --git a/main.c b/main.c
+index f40a029..5deeff7 100644
+--- a/main.c
++++ b/main.c
+@@ -63,9 +63,9 @@ static void *thread_func_write(const _thread_params *thp)
+         } else {
+             clock_gettime(CLOCK_MONOTONIC, &after);
+         }
+-
+-        fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n",
+-                        th, timespec_to_ns(after), elapsed_ns(before, after));
++        unsigned long e = elapsed_ns(before, after);
++//        fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n", th, timespec_to_ns(after), e);
++        LOG_TRACE("The previous line took %lu ns", e);
+     }
+ 
+     return NULL;
+diff --git a/test.sh b/test.sh
+index b6aedf3..b23547c 100755
+--- a/test.sh
++++ b/test.sh
+@@ -14,7 +14,8 @@
+ # along with this program. If not, see <http://www.gnu.org/licenses/>.
+ 
+ #        <threads> <qmin> <qmax> <total> <max/thd> <us wait> <chance 1/n> [non-blocking (0)] [print lost (0)] [delay sec]
+-default=( 5        50     200    100000  1000      100       10           0                  0                5         )
++#default=( 5        50     200    100000  1000      100       10           0                  0                5         )
++default=(3 2000 2000 200000 1000 1 1000 0 0 5)
+ 
+ [ $# -gt 0 ] && params=(${*}) || params=(${default[*]})
+ 
