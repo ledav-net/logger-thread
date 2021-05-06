@@ -55,6 +55,7 @@ typedef enum {
     LOGGER_OPT_NONE      = 0,	/* No options. Use default values ! */
     LOGGER_OPT_NONBLOCK  = 1,	/* return -1 and EAGAIN when the queue is full */
     LOGGER_OPT_PRINTLOST = 2,	/* Print lost lines soon as there is some free space again */
+    LOGGER_OPT_PREALLOC  = 4,	/* Force the kernel to really allocate the bloc (to bypass the copy-on-write mechanism) */
 } logger_opts_t;
 
 /* Definition of a log line */

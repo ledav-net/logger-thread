@@ -87,7 +87,7 @@ int main(int argc, char **argv)
         .print_max   = atoi(argv[5]),
         .uwait       = atoi(argv[6]),
         .chances     = atoi(argv[7]),
-        .opts        = LOGGER_OPT_NONE,
+        .opts        = LOGGER_OPT_PREALLOC,
     };
     if (argc > 8) {
         if (atoi(argv[8]) ) {

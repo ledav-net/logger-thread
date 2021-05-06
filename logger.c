@@ -48,7 +48,7 @@ static void _logger_set_thread_name(logger_write_queue_t *wrq)
     wrq->thread_name_len = strlen(wrq->thread_name);
 }
 
-logger_write_queue_t *_logger_alloc_write_queue(int lines_max)
+logger_write_queue_t *_logger_alloc_write_queue(int lines_max, logger_opts_t opts)
 {
     if (logger.queues_nr == logger.queues_max) {
         return errno = ENOBUFS, NULL;
@@ -56,7 +56,24 @@ logger_write_queue_t *_logger_alloc_write_queue(int lines_max)
     logger_write_queue_t *wrq = calloc(1, sizeof(logger_write_queue_t));
     wrq->lines = calloc(lines_max, sizeof(logger_line_t));
     wrq->lines_nr = lines_max;
+    wrq->opts = opts;
     _logger_set_thread_name(wrq);
+
+    if (opts & LOGGER_OPT_PREALLOC) {
+        /**
+         * Pre-fill the queue with something so that Linux really allocate
+         * the pages.  This is due to the 'copy-on-write' logic where the
+         * page is really allocated (or copied) when the process try to
+         * write something.
+         * Note: Didn't found a better way to do this ...
+         */
+        for (int i=0 ; i<lines_max ; i++) {
+            wrq->lines[i].ts.tv_nsec = ~0;
+            for (int j=0, k=0 ; j < sizeof(wrq->lines[i].str)/64 ; j++ ) {
+                wrq->lines[i].str[j] = k++;
+            }
+        }
+    }
 
     /* Ensure this is done atomically between writers. Reader is safe. */
     pthread_mutex_lock(&logger.queues_mx);
@@ -156,12 +173,13 @@ retry:
             goto retry;
         }
         _logger_set_thread_name(fwrq);
+        fwrq->opts = opts ?: logger.opts;
 
         fprintf(stderr, "<%s> Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
                         fwrq->thread_name, fwrq->queue_idx, lines_max, fwrq->lines_nr);
     } else {
         /* No free queue that fits our needs... Adding a new one. */
-        fwrq = _logger_alloc_write_queue(lines_max);
+        fwrq = _logger_alloc_write_queue(lines_max, opts ?: logger.opts);
         if (!fwrq) {
             return -1;
         }
@@ -169,7 +187,6 @@ retry:
                         fwrq->thread_name, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
                         (lines_max * sizeof(logger_line_t)) >> 10);
     }
-    fwrq->opts = opts ?: logger.opts;
     _own_wrq = fwrq;
     return 0;
 }
