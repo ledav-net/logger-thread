@@ -22,7 +22,7 @@
 const logger_line_colors_t logger_colors_bw = {
     .reset = "",
     .level = {
-        [LOGGER_LEVEL_FIRST ... LOGGER_LEVEL_LAST] = "",
+        [LOGGER_LEVEL_ALL] = "",
     },
     .time  = "",
     .date  = "",
@@ -32,6 +32,8 @@ const logger_line_colors_t logger_colors_bw = {
 
 const logger_line_colors_t logger_colors_default = {
     .level       = {
+        [LOGGER_LEVEL_ALL]      = "", /* Default. In case we miss one ... */
+
         [LOGGER_LEVEL_EMERG]    = C_BR C_LW,
         [LOGGER_LEVEL_ALERT]    = C_UNL C_LR,
         [LOGGER_LEVEL_CRITICAL] = C_LR,

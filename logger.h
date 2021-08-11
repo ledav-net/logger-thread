@@ -51,6 +51,8 @@ typedef enum {
     LOGGER_LEVEL_LAST  = LOGGER_LEVEL_COUNT - 1,	/* Last level value */
 } logger_line_level_t;
 
+#define LOGGER_LEVEL_ALL LOGGER_LEVEL_FIRST ... LOGGER_LEVEL_LAST
+
 typedef enum {
     LOGGER_OPT_NONE      = 0,	/* No options. Use default values ! */
     LOGGER_OPT_NONBLOCK  = 1,	/* return -1 and EAGAIN when the queue is full */
