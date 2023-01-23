@@ -149,6 +149,10 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define timespec_to_ns(a)	((STON((a).tv_sec) + (a).tv_nsec))
 #define elapsed_ns(b,a) 	(timespec_to_ns(a) - timespec_to_ns(b))
 
+#if defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF)
+#error Both LOGGER_USE_THREAD and LOGGER_USE_PRINTF are defined ! You need to choose...
+#endif
+
 #if defined(LOGGER_USE_THREAD)
 #define LOG_LEVEL(lvl, fmt, ...) logger_printf( \
     (lvl), \
@@ -222,7 +226,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
     __FUNCTION__, \
     __LINE__, \
     fmt, ## __VA_ARGS__)
-#endif
+#endif // defined(LOGGER_USE_THREAD)
 
 #if defined(LOGGER_USE_PRINTF)
 #include <stdio.h>
@@ -278,7 +282,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define logger_pthread_create(a, b, c, d, e, f, g) ({ \
             (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
 })
-#endif // !(defined(LOGGER_USE_THREAD) && defined(LOGGER_USE_PRINTF))
+#endif // !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
 
 #ifdef __cplusplus
 }
