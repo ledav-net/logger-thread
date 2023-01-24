@@ -39,7 +39,7 @@
 static const char * const _logger_level_label[LOGGER_LEVEL_COUNT] = {
     [LOGGER_LEVEL_EMERG]    = "EMERG",
     [LOGGER_LEVEL_ALERT]    = "ALERT",
-    [LOGGER_LEVEL_CRITICAL] = "CRIT ",
+    [LOGGER_LEVEL_CRITICAL] = "CRIT!",
     [LOGGER_LEVEL_ERROR]    = "ERROR",
     [LOGGER_LEVEL_WARNING]  = "WARN!",
     [LOGGER_LEVEL_NOTICE]   = "NOTCE",
@@ -116,8 +116,7 @@ static int _logger_write_line(const logger_write_queue_t *wrq, const logger_line
     if (wrq->thread_name_len > biggest_thread_name) {
         biggest_thread_name = wrq->thread_name_len;
     }
-    len = snprintf(linestr,
-            sizeof(linestr),
+    len = snprintf(linestr, sizeof(linestr),
             "%s%s:%02d.%03lu,%03lu [%s%s%s] %*s <%s%*s%s> %s\n",
             _logger_get_date(l->ts.tv_sec, c),
             _logger_get_time(l->ts.tv_sec, c),
