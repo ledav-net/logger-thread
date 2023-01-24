@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Copyright (C) 2020 David De Grave <david@ledav.net>
  *

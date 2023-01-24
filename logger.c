@@ -86,7 +86,7 @@ logger_write_queue_t *_logger_alloc_write_queue(int lines_max, logger_opts_t opt
     return wrq;
 }
 
-int logger_init(int queues_max, int lines_max, logger_opts_t opts)
+int logger_init(int queues_max, int lines_max, logger_line_level_t level_min, logger_opts_t opts)
 {
     memset(&logger, 0, sizeof(logger_t));
 
@@ -97,6 +97,7 @@ int logger_init(int queues_max, int lines_max, logger_opts_t opts)
     logger.opts = opts;
     logger.theme = &logger_colors_default;
     logger.default_lines_nr = lines_max;
+    logger.level_min = level_min;
     logger.running = true;
 
     _own_wrq = NULL;
@@ -290,6 +291,9 @@ int logger_printf(logger_line_level_t level,
     if (!logger.running) {
         return errno = ENOTCONN, -1;
     }
+    if (level > logger.level_min) {
+        return 0;
+    }
     if (!_own_wrq && logger_assign_write_queue(0, LOGGER_OPT_NONE) < 0) {
         return -1;
     }
@@ -350,4 +354,4 @@ reindex:
     return 0;
 }
 
-#endif
+#endif // defined(LOGGER_USE_THREAD)

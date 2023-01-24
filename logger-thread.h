@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Copyright (C) 2020 David De Grave <david@ledav.net>
  *
@@ -52,4 +53,4 @@ extern void * _thread_logger(void);
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif // _LOGGER_THREAD_H

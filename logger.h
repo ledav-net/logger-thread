@@ -1,3 +1,4 @@
+#pragma once
 /*
  * Copyright (C) 2020 David De Grave <david@ledav.net>
  *
@@ -52,6 +53,7 @@ typedef enum {
 } logger_line_level_t;
 
 #define LOGGER_LEVEL_ALL LOGGER_LEVEL_FIRST ... LOGGER_LEVEL_LAST
+#define LOGGER_LEVEL_DEFAULT LOGGER_LEVEL_LAST
 
 typedef enum {
     LOGGER_OPT_NONE      = 0,	/* No options. Use default values ! */
@@ -102,6 +104,7 @@ typedef struct {
     int			 	queues_nr;		/* Number of queues allocated */
     int			 	queues_max;		/* Maximum number of possible queues */
     int				default_lines_nr;	/* Default number of lines max / buffer to use */
+    logger_line_level_t		level_min;		/* Minimum level to be printed/processed */
     bool		 	running;		/* Set to true when the reader thread is running */
     bool		 	empty;			/* Set to true when all the queues are empty */
     logger_opts_t	 	opts;			/* Default logger options. Some can be fine tuned by write queue */
@@ -112,34 +115,35 @@ typedef struct {
     const logger_line_colors_t	*theme;			/* Color theme to use */
 } logger_t;
 
-int			logger_init(			/* Initialize the logger manager */
-                            int queues_max,		/* Hard limit of queues that can be allocated */
-                            int lines_max_def,		/* Recommanded log lines to allocate by default */
-                            logger_opts_t options);	/* See options above. */
+int	logger_init(					/* Initialize the logger manager */
+		int queues_max,				/* Hard limit of queues that can be allocated */
+		int lines_max_def,			/* Recommended log lines to allocate by default */
+		logger_line_level_t level_min,		/* Minimum level to be printed/processed */
+		logger_opts_t options);			/* See options above. */
 
-void			logger_deinit(void);		/* Empty the queues and free all the ressources */
+void	logger_deinit(void);				/* Empty the queues and free all the ressources */
 
-int			logger_assign_write_queue(	/* Assign a queue to the calling thread */
-                            unsigned int lines_max,	/* Max lines buffer (=0 use default) */
-                            logger_opts_t opts);	/* If not precised, use the logger's options */
+int	logger_assign_write_queue(			/* Assign a queue to the calling thread */
+		unsigned int lines_max,			/* Max lines buffer (=0 use default) */
+		logger_opts_t opts);			/* If not precised, use the logger's options */
 
-int			logger_free_write_queue(void);	/* Release the write queue for another thread */
+int	logger_free_write_queue(void);			/* Release the write queue for another thread */
 
-int			logger_pthread_create(		/* Create a new thread with logger queue assignment */
-                            const char *thread_name,	/* Thread name to give */
-                            unsigned int max_lines,	/* Lines buffer to allocte for that thread (=0 use default) */
-                            logger_opts_t opts,		/* Options to used for this queue. (=0 use default) */
-                            pthread_t *thread,		/* See pthread_create(3) for these args */
-                            const pthread_attr_t *attr,
-                            void *(*start_routine)(void *),
-                            void *arg);
+int	logger_pthread_create(				/* Create a new thread with logger queue assignment */
+		const char *thread_name,		/* Thread name to give */
+		unsigned int max_lines,			/* Lines buffer to allocte for that thread (=0 use default) */
+		logger_opts_t opts,			/* Options to used for this queue. (=0 use default) */
+		pthread_t *thread,			/* See pthread_create(3) for these args */
+		const pthread_attr_t *attr,
+		void *(*start_routine)(void *),
+		void *arg);
 
-int			logger_printf(			/* Print a message */
-                            logger_line_level_t level,	/* Importance level of this print */
-                            const char *src,		/* Source/Func/Line this print was issued */
-                            const char *func,
-                            unsigned int line,
-                            const char *format, ...);	/* printf() like format & arguments ... */
+int	logger_printf(					/* Print a message */
+		logger_line_level_t level,		/* Importance level of this print */
+		const char *src,			/* Source file of this msg */
+		const char *func,			/* Function of this msg */
+		unsigned int line,			/* Line of this msg */
+		const char *format, ...);		/* printf() like format & arguments ... */
 
 extern logger_t logger; /* Global logger context */
 
@@ -153,80 +157,100 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #error Both LOGGER_USE_THREAD and LOGGER_USE_PRINTF are defined ! You need to choose...
 #endif
 
+/* If the following defines are defined (on the command line for example),
+ * the code concerning the excluded levels are stripped off the the objets.
+ * If not defined, include all the code.
+ *
+ * Take care for things like `LOG_DEBUG(function());` ... `function()` will
+ * never be called as whatever is passed to LOG_DEBUG is stripped off.
+ */
+#if   defined(LOGGER_LEVEL_MIN_EMERG)
+#define _MIN_LOGGER_LEVEL 0
+#elif defined(LOGGER_LEVEL_MIN_ALERT)
+#define _MIN_LOGGER_LEVEL 1
+#elif defined(LOGGER_LEVEL_MIN_CRITICAL)
+#define _MIN_LOGGER_LEVEL 2
+#elif defined(LOGGER_LEVEL_MIN_ERROR)
+#define _MIN_LOGGER_LEVEL 3
+#elif defined(LOGGER_LEVEL_MIN_WARNING)
+#define _MIN_LOGGER_LEVEL 4
+#elif defined(LOGGER_LEVEL_MIN_NOTICE)
+#define _MIN_LOGGER_LEVEL 5
+#elif defined(LOGGER_LEVEL_MIN_INFO)
+#define _MIN_LOGGER_LEVEL 6
+#elif defined(LOGGER_LEVEL_MIN_DEBUG)
+#define _MIN_LOGGER_LEVEL 7
+#elif defined(LOGGER_LEVEL_MIN_OKAY)
+#define _MIN_LOGGER_LEVEL 8
+#elif defined(LOGGER_LEVEL_MIN_TRACE)
+#define _MIN_LOGGER_LEVEL 9
+#elif defined(LOGGER_LEVEL_MIN_OOPS)
+#define _MIN_LOGGER_LEVEL 10
+#else
+#define _MIN_LOGGER_LEVEL 99
+#endif
+
 #if defined(LOGGER_USE_THREAD)
-#define LOG_LEVEL(lvl, fmt, ...) logger_printf( \
-    (lvl), \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_EMERGENCY(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_EMERGENCY, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_ALERT(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_ALERT, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_CRITICAL(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_CRITICAL, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_ERROR(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_ERROR, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_WARNING(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_WARNING, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_NOTICE(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_NOTICE, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_INFO(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_INFO, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_DEBUG(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_DEBUG, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_OKAY(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_OKAY, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_OOPS(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_OOPS, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#define LOG_TRACE(fmt, ...)	logger_printf( \
-    LOGGER_LEVEL_TRACE, \
-    __FILE__, \
-    __FUNCTION__, \
-    __LINE__, \
-    fmt, ## __VA_ARGS__)
-#endif // defined(LOGGER_USE_THREAD)
+
+#define LOG_LEVEL(lvl, fmt, ...) logger_printf((lvl), __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+
+#if _MIN_LOGGER_LEVEL >= 0
+#define LOG_EMERGENCY(fmt, ...)	logger_printf(LOGGER_LEVEL_EMERG, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_EMERGENCY(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 1
+#define LOG_ALERT(fmt, ...)	logger_printf(LOGGER_LEVEL_ALERT, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_ALERT(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 2
+#define LOG_CRITICAL(fmt, ...)	logger_printf(LOGGER_LEVEL_CRITICAL, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_CRITICAL(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 3
+#define LOG_ERROR(fmt, ...)	logger_printf(LOGGER_LEVEL_ERROR, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_ERROR(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 4
+#define LOG_WARNING(fmt, ...)	logger_printf(LOGGER_LEVEL_WARNING, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_WARNING(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 5
+#define LOG_NOTICE(fmt, ...)	logger_printf(LOGGER_LEVEL_NOTICE, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_NOTICE(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 6
+#define LOG_INFO(fmt, ...)	logger_printf(LOGGER_LEVEL_INFO, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_INFO(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 7
+#define LOG_DEBUG(fmt, ...)	logger_printf(LOGGER_LEVEL_DEBUG, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_DEBUG(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 8
+#define LOG_OKAY(fmt, ...)	logger_printf(LOGGER_LEVEL_OKAY, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_OKAY(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 9
+#define LOG_TRACE(fmt, ...)	logger_printf(LOGGER_LEVEL_TRACE, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_TRACE(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 10
+#define LOG_OOPS(fmt, ...)	logger_printf(LOGGER_LEVEL_OOPS, __FILE__, __FUNCTION__, __LINE__, fmt, ## __VA_ARGS__)
+#else
+#define LOG_OOPS(...)		({ (int)0; })
+#endif
+
+#else
 
 #if defined(LOGGER_USE_PRINTF)
 #include <stdio.h>
@@ -237,52 +261,96 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #define LOG_LEVEL(lvl, fmt, ...) ({ \
         (void)(lvl); _LOG_PRINTF(fmt, ## __VA_ARGS__ ); \
 })
+#if _MIN_LOGGER_LEVEL >= 0
 #define LOG_EMERGENCY		_LOG_PRINTF
+#else
+#define LOG_EMERGENCY(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 1
 #define LOG_ALERT		_LOG_PRINTF
+#else
+#define LOG_ALERT(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 2
 #define LOG_CRITICAL		_LOG_PRINTF
+#else
+#define LOG_CRITICAL(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 3
 #define LOG_ERROR		_LOG_PRINTF
+#else
+#define LOG_ERROR(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 4
 #define LOG_WARNING		_LOG_PRINTF
+#else
+#define LOG_WARNING(...)	({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 5
 #define LOG_NOTICE		_LOG_PRINTF
+#else
+#define LOG_NOTICE(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 6
 #define LOG_INFO		_LOG_PRINTF
+#else
+#define LOG_INFO(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 7
 #define LOG_DEBUG		_LOG_PRINTF
+#else
+#define LOG_DEBUG(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 8
 #define LOG_OKAY		_LOG_PRINTF
-#define LOG_OOPS		_LOG_PRINTF
+#else
+#define LOG_OKAY(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 9
 #define LOG_TRACE		_LOG_PRINTF
+#else
+#define LOG_TRACE(...)		({ (int)0; })
+#endif
+#if _MIN_LOGGER_LEVEL >= 10
+#define LOG_OOPS		_LOG_PRINTF
+#else
+#define LOG_OOPS(...)		({ (int)0; })
+#endif
 
-#define logger_init(...)		({ (void)0; })
+#define logger_init(...)		({ (int)0; })
 #define logger_deinit(...)		({ (void)0; })
-#define logger_assign_write_queue(...)	({ (void)0; })
-#define logger_free_write_queue(...)	({ (void)0; })
+#define logger_assign_write_queue(...)	({ (int)0; })
+#define logger_free_write_queue(...)	({ (int)0; })
+
+#define logger_pthread_create(a, b, c, d, e, f, g) ({ \
+            (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
+})
+
+#else // default => Strip all
+
+#define LOG_LEVEL(lvl, ...)	({ (void)(lvl); (int)0; })
+#define LOG_EMERGENCY(...)	({ (int)0; })
+#define LOG_ALERT(...)		({ (int)0; })
+#define LOG_CRITICAL(...)	({ (int)0; })
+#define LOG_ERROR(...)		({ (int)0; })
+#define LOG_WARNING(...)	({ (int)0; })
+#define LOG_NOTICE(...)		({ (int)0; })
+#define LOG_INFO(...)		({ (int)0; })
+#define LOG_DEBUG(...)		({ (int)0; })
+#define LOG_OKAY(...)		({ (int)0; })
+#define LOG_OOPS(...)		({ (int)0; })
+#define LOG_TRACE(...)		({ (int)0; })
+
+#define logger_init(...)		({ (int)0; })
+#define logger_deinit(...)		({ (void)0; })
+#define logger_assign_write_queue(...)	({ (int)0; })
+#define logger_free_write_queue(...)	({ (int)0; })
 
 #define logger_pthread_create(a, b, c, d, e, f, g) ({ \
             (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
 })
 #endif // defined(LOGGER_USE_PRINTF)
-
-#if !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
-
-#define LOG_LEVEL(lvl, ...)	({ (void)(lvl); (void)0; })
-#define LOG_EMERGENCY(...)	({ (void)0; })
-#define LOG_ALERT(...)		({ (void)0; })
-#define LOG_CRITICAL(...)	({ (void)0; })
-#define LOG_ERROR(...)		({ (void)0; })
-#define LOG_WARN(...)		({ (void)0; })
-#define LOG_NOTICE(...)		({ (void)0; })
-#define LOG_INFO(...)		({ (void)0; })
-#define LOG_DEBUG(...)		({ (void)0; })
-#define LOG_OK(...)		({ (void)0; })
-#define LOG_OOPS(...)		({ (void)0; })
-#define LOG_TRACE(...)		({ (void)0; })
-
-#define logger_init(...)		({ (void)0; })
-#define logger_deinit(...)		({ (void)0; })
-#define logger_assign_write_queue(...)	({ (void)0; })
-#define logger_free_write_queue(...)	({ (void)0; })
-
-#define logger_pthread_create(a, b, c, d, e, f, g) ({ \
-            (void)(a); (void)(b); (void)(c); pthread_create(d, e, f, g); \
-})
-#endif // !defined(LOGGER_USE_THREAD) && !defined(LOGGER_USE_PRINTF)
+#endif // defined(LOGGER_USE_THREAD)
 
 #ifdef __cplusplus
 }
