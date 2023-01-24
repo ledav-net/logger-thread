@@ -214,6 +214,10 @@ static inline int _logger_wakeup_reader_if_needed(void)
 
 int logger_free_write_queue(void)
 {
+    if (!_own_wrq) {
+        /* No queue allocated. Nothing to do ... */
+        return 0;
+    }
     fprintf(stderr, "<%s> Freeing queue %d ...\n", _own_wrq->thread_name, _own_wrq->queue_idx);
     while (_own_wrq->rd_seq != _own_wrq->wr_seq) {
         if (_logger_wakeup_reader_if_needed() < 0) {
@@ -245,7 +249,8 @@ static void _logger_pthread_wrapper(_thread_params *params)
      * pthread_setname_np() call must occur before the assignation bellow.
      * If there is no name specified, thread_id is used instead.
      */
-    if (logger_assign_write_queue(params->max_lines, params->opts) < 0) {
+    if (!(params->opts & LOGGER_OPT_NOQUEUE)
+    &&  logger_assign_write_queue(params->max_lines, params->opts) < 0) {
         /**
          * Oops!  If this happen, it could mean the limit of queues to
          * allocate is too low !!
@@ -254,12 +259,18 @@ static void _logger_pthread_wrapper(_thread_params *params)
     }
     /**
      * Must be called when the thread don't need it anymore.  Otherwise it
-     * will stay allocated for an unexistant thread for ever !  This is also
-     * true for the local threads forked by the domains themself.
+     * will stay allocated for an unexistant thread for ever !
      *
-     * Note also that if this thread never print something, you should NOT
+     * Note also that if this thread never call logger_printf, you should not
      * use this wrapper but better use the native pthread_create(3) instead
      * as all this is useless and reserve a log queue for nothing ...
+     *
+     * If you think logger_printf() will be called in rare cases (or from
+     * sub-functions you don't manage), you can use the option
+     * LOGGER_OPT_NOQUEUE to don't reserve a queue at fork time.  The
+     * counterpart of using this is that the queue is reserved at print time
+     * using the default options and the allocation errors are detected at
+     * that time only.
      */
     pthread_cleanup_push((void *)logger_free_write_queue, NULL);
 

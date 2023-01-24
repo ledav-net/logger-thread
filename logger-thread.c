@@ -116,7 +116,8 @@ static int _logger_write_line(const logger_write_queue_t *wrq, const logger_line
     if (wrq->thread_name_len > biggest_thread_name) {
         biggest_thread_name = wrq->thread_name_len;
     }
-    len = sprintf(linestr,
+    len = snprintf(linestr,
+            sizeof(linestr),
             "%s%s:%02d.%03lu,%03lu [%s%s%s] %*s <%s%*s%s> %s\n",
             _logger_get_date(l->ts.tv_sec, c),
             _logger_get_time(l->ts.tv_sec, c),
