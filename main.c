@@ -56,12 +56,39 @@ static void *thread_func_write(const _thread_params *thp)
         struct timespec before, after;
         int level = rand() % LOGGER_LEVEL_COUNT;
 
+        int r = -2;
+
         clock_gettime(CLOCK_MONOTONIC, &before);
-        if ( LOG_LEVEL(level, "<%s> %d", th, seq) < 0 ) {
-            clock_gettime(CLOCK_MONOTONIC, &after);
+
+        switch ( level ) {
+        case LOGGER_LEVEL_EMERG:
+            r = LOG_EMERGENCY("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_ALERT:
+            r = LOG_ALERT("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_CRITICAL:
+            r = LOG_CRITICAL("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_ERROR:
+            r = LOG_ERROR("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_WARNING:
+            r = LOG_WARNING("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_NOTICE:
+            r = LOG_NOTICE("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_INFO:
+            r = LOG_INFO("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_DEBUG:
+            r = LOG_DEBUG("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_OKAY:
+            r = LOG_OKAY("<%s> %d", th, seq); break;
+        case LOGGER_LEVEL_TRACE:
+            r = LOG_TRACE("<%s> %d", th, seq); break;
+        default:
+            r = LOG_OOPS("<%s> %d", th, seq); break;
+        }
+
+        clock_gettime(CLOCK_MONOTONIC, &after);
+
+        if ( r < 0 ) {
             fprintf(stderr, "<%s> %d **LOST** (%m)\n", th, seq);
-        } else {
-            clock_gettime(CLOCK_MONOTONIC, &after);
         }
 
         fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n",
@@ -117,7 +144,7 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_MONOTONIC, &after);
     fprintf(stderr, "%lu ns\n\n", elapsed_ns(before, after));
 
-    logger_init(thp.thread_max * 1.5, 50, 0);
+    logger_init(thp.thread_max * 1.5, 50, LOGGER_LEVEL_DEFAULT, LOGGER_OPT_NONE);
     sleep(start_wait);
 
     /* Writer threads */
