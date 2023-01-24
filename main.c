@@ -121,7 +121,7 @@ int main(int argc, char **argv)
         .print_max   = atoi(argv[5]),
         .uwait       = atoi(argv[6]),
         .chances     = atoi(argv[7]),
-        .opts        = LOGGER_OPT_PREALLOC,
+        .opts        = LOGGER_OPT_NOQUEUE,
     };
     if (argc > 8) {
         if (atoi(argv[8]) ) {
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     for (int i=0 ; i < thp.thread_max ; i++ ) {
         int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
 
-        snprintf(tnm[i], LOGGER_MAX_THREAD_NAME_SZ, "writer-thd-%04d", i);
+        snprintf(tnm[i], LOGGER_MAX_THREAD_NAME_SZ, "writer-thd-%04d", (char)i);
         logger_pthread_create(tnm[i], queue_size, thp.opts,
                                     &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
 
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
             if ( printed_lines < thp.lines_total ) {
                 // Not the right amount... Restart the exited thread
                 int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
-                logger_pthread_create(tnm[i], queue_size, LOGGER_OPT_NONE,
+                logger_pthread_create(tnm[i], queue_size, thp.opts,
                                         &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
                 printed_lines += thp.print_max;
                 fprintf(stderr, "Restarting thread %02d ...\n", i);
