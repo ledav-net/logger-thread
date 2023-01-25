@@ -110,7 +110,8 @@ int main(int argc, char **argv)
     int start_wait = 0;
 
     if (argc < 7) {
-        printf("%s <threads> <min q lines> <max q lines> <total lines> <print max/thd> <us wait> <wait chances> [blocking (0)] [printlost (0)] [delay sec]\n", argv[0]);
+        printf("%s <threads> <min q lines> <max q lines> <total lines> <print max/thd> <us wait> <wait chances> "
+               "[blocking (0)] [printlost (0)] [noqueue (0)] [prealloc (0à)] [delay sec]\n", argv[0]);
         return 1;
     }
     _thread_params thp = {
@@ -121,10 +122,10 @@ int main(int argc, char **argv)
         .print_max   = atoi(argv[5]),
         .uwait       = atoi(argv[6]),
         .chances     = atoi(argv[7]),
-        .opts        = LOGGER_OPT_NOQUEUE,
+        .opts        = LOGGER_OPT_NONE,
     };
     if (argc > 8) {
-        if (atoi(argv[8]) ) {
+        if (atoi(argv[8])) {
             thp.opts |= LOGGER_OPT_NONBLOCK;
         }
     }
@@ -133,16 +134,28 @@ int main(int argc, char **argv)
             thp.opts |= LOGGER_OPT_PRINTLOST;
         }
     }
-    if (argc > 10) {
-        start_wait = atoi(argv[10]);
+    if ( argc > 10) {
+        if (atoi(argv[10])) {
+            thp.opts |= LOGGER_OPT_NOQUEUE;
+        }
+    }
+    if ( argc > 11) {
+        if (atoi(argv[11])) {
+            thp.opts |= LOGGER_OPT_PREALLOC;
+        }
+    }
+    if (argc > 12) {
+        start_wait = atoi(argv[12]);
     }
     srand(time(NULL));
 
     fprintf(stderr, "cmdline: "); for (int i=0; i<argc; i++) { fprintf(stderr, "%s ", argv[i]); }
-    fprintf(stderr, "\nthreads[%d] q_min[%d] q_max[%d] lines_total[%d] max_lines/thr[%lu] (1/%d chances to wait %d us) %s%s\n"
+    fprintf(stderr, "\nthreads[%d] q_min[%d] q_max[%d] lines_total[%d] max_lines/thr[%lu] (1/%d chances to wait %d us)%s%s%s%s\n"
                     , thp.thread_max, thp.lines_min, thp.lines_max, thp.lines_total, thp.print_max, thp.chances, thp.uwait
-                    , thp.opts & LOGGER_OPT_NONBLOCK  ? "non-blocking" : ""
-                    , thp.opts & LOGGER_OPT_PRINTLOST ? "+printlost"   : "");
+                    , thp.opts & LOGGER_OPT_NONBLOCK  ? " non-blocking" : ""
+                    , thp.opts & LOGGER_OPT_PRINTLOST ? "+printlost"    : ""
+                    , thp.opts & LOGGER_OPT_NOQUEUE   ? " noqueue"      : ""
+                    , thp.opts & LOGGER_OPT_PREALLOC  ? " prealloc"     : "");
     fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
     struct timespec before, after;

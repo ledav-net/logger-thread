@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # SPDX-License-Identifier: MIT
 #
 # Copyright 2022 David De Grave <david@ledav.net>
@@ -20,10 +20,31 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#        <threads> <qmin> <qmax> <total> <max/thd> <us wait> <chance 1/n> [non-blocking (0)] [print lost (0)] [delay sec]
-default=( 5        50     200    100000  1000      100       10           0                  0                5         )
+default=()
 
+# NOTE! Don't change the order of the definitions below.
+
+default+=(5)		# <threads>	Number of concurrent threads to keep running to print <total> lines.
+default+=(50)		# <qmin>	Minimum size (in lines) of the queue to allocate per thread.
+default+=(200)		# <qmax>	Maximum size (in linesà of the queue to allocate per thread. The size is allocated between <qmin> and <qmax>.
+default+=(100000)	# <total>	Total number of lines to print, using <threads> producers
+default+=(500)		# <max/thd>	Maximum of lines to process per thread. A new one is allocated using a new queue, with a size betwen <qmin> and <qmax>.
+default+=(100)		# <wait>	Penality (time in micro seconds) the thread will wait when it has no <chance>.
+default+=(10)		# <chance>	On each printed line, wait <wait> micro seconds 1 time on <chance> (simulate a more "realistic" logging)
+
+# The following options are bolleans. Enabled = 1, Disabled = 0
+
+default+=(0)	# [non-blocking] Non-blocking mode. Wait when the queue is full (blocking) or loose the line (non-blocking).
+default+=(0)	# [print lost]   If non-blocking mode is enabled, print the number of lines lost so far, soon as the queue is not empty anymore.
+default+=(0)	# [noqueue]	 Start of the threads with no queue assignment. Done at the first logger_printlog() call.
+default+=(0)	# [prealloc]	 Fills the allocated queues with garbage to force Linux to reserve the page (copy-on-write workaround).
+default+=(3) 	# [delay sec]    Start time delay ...
+
+# You can specify your own parameters on the command line, the have precedence.
+# The ones between <> below are mandatory.
 [ $# -gt 0 ] && params=(${*}) || params=(${default[*]})
 
+# Params = <threads> <qmin> <qmax> <total> <max/thd> <us wait> <chance 1/n> [non-blocking (0)] [print lost (0)] [noqueue (0)] [prealloc (0)] [delay sec]
 /usr/bin/time -v ./logger ${params[*]} > out.log 2>&1 &
 less -RS +F < out.log
+wait
