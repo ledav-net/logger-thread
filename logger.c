@@ -318,6 +318,10 @@ int logger_printf(logger_line_level_t level,
     va_list ap;
     int index;
     logger_line_t *l;
+    struct timespec ts;
+
+    /* Save the time this function get called */
+    clock_gettime(CLOCK_REALTIME, &ts);
 
 reindex:
     index = _own_wrq->wr_seq % _own_wrq->lines_nr;
@@ -354,7 +358,7 @@ reindex:
     }
     va_start(ap, format);
 
-    clock_gettime(CLOCK_REALTIME, &l->ts);
+    l->ts = ts;
     l->level = level;
     l->file = src;
     l->func = func;
