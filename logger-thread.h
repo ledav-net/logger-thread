@@ -49,7 +49,7 @@ extern "C" {
 #define futex_timed_wait(addr, val, ts)	_futex((addr), FUTEX_WAIT_PRIVATE, (val), (ts))
 #define futex_wake(addr, val)		_futex((addr), FUTEX_WAKE_PRIVATE, (val), NULL)
 
-inline int _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
+inline int __attribute__((always_inline)) _futex(atomic_int *uaddr, int futex_op, int val, struct timespec *tv)
 {
     /* Note: not using the last 2 parameters uaddr2 & val2 (see man futex(2)) */
     return syscall(SYS_futex, uaddr, futex_op, val, tv);
