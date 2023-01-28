@@ -264,7 +264,7 @@ extern const logger_line_colors_t logger_colors_default;/* Default theme */
 #include <stdio.h>
 
 #define _LOG_PRINTF(fmt, ...) \
-        printf("%s: %s: (%d) " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__)
+        printf("%s: %s:%4d> " fmt "\n", __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__)
 
 #define LOG_LEVEL(lvl, fmt, ...) ({ \
         (void)(lvl); _LOG_PRINTF(fmt, ## __VA_ARGS__ ); \

@@ -54,60 +54,65 @@ typedef struct {
     int opts;
 } _thread_params;
 
+typedef struct  {
+    const _thread_params *params;  // Input parameters
+    const unsigned int   *work;    // Input workset to print
+    unsigned int         *printed; // Output printed lines (thread)
+} _thread_args;
+
 /* Test thread */
-static void *thread_func_write(const _thread_params *thp)
+static void *thread_func_write(const _thread_args *tha)
 {
     char th[LOGGER_MAX_THREAD_NAME_SZ];
+    unsigned long elapsed = 0;
+    unsigned int  count = 0;
 
     pthread_getname_np(pthread_self(), th, sizeof(th));
 
-    for (int seq = 0; seq < thp->print_max; seq++) {
-        if (!(rand() % thp->chances)) {
-            dbg_printf("<%s> Bad luck, waiting for %d usec\n", th, thp->uwait);
-            usleep(thp->uwait);
+    for (int seq = 0; seq < *tha->work; seq++) {
+        if (!(rand() % tha->params->chances)) {
+            dbg_printf("<%s> Bad luck, waiting for %d usec\n", th, tha->params->uwait);
+            usleep(tha->params->uwait);
         }
         struct timespec before, after;
-        int level = rand() % LOGGER_LEVEL_COUNT;
-
-        int r = -2;
+        int level = rand() % LOGGER_LEVEL_COUNT, r;
 
         clock_gettime(CLOCK_MONOTONIC, &before);
 
         switch ( level ) {
         case LOGGER_LEVEL_EMERG:
-            r = LOG_EMERGENCY("<%s> %d", th, seq); break;
+            r = LOG_EMERGENCY("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_ALERT:
-            r = LOG_ALERT("<%s> %d", th, seq); break;
+            r = LOG_ALERT("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_CRITICAL:
-            r = LOG_CRITICAL("<%s> %d", th, seq); break;
+            r = LOG_CRITICAL("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_ERROR:
-            r = LOG_ERROR("<%s> %d", th, seq); break;
+            r = LOG_ERROR("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_WARNING:
-            r = LOG_WARNING("<%s> %d", th, seq); break;
+            r = LOG_WARNING("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_NOTICE:
-            r = LOG_NOTICE("<%s> %d", th, seq); break;
+            r = LOG_NOTICE("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_INFO:
-            r = LOG_INFO("<%s> %d", th, seq); break;
+            r = LOG_INFO("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_DEBUG:
-            r = LOG_DEBUG("<%s> %d", th, seq); break;
+            r = LOG_DEBUG("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_OKAY:
-            r = LOG_OKAY("<%s> %d", th, seq); break;
+            r = LOG_OKAY("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         case LOGGER_LEVEL_TRACE:
-            r = LOG_TRACE("<%s> %d", th, seq); break;
+            r = LOG_TRACE("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         default:
-            r = LOG_OOPS("<%s> %d", th, seq); break;
+            r = LOG_OOPS("Message #%-5d (the previous call to logger_printf() took %lu ns)", seq, elapsed); break;
         }
 
         clock_gettime(CLOCK_MONOTONIC, &after);
+        elapsed = elapsed_ns(before, after);
 
         if ( r < 0 ) {
             dbg_printf("<%s> Message #%d **LOST** (%m)\n", th, seq);
         }
-
-        dbg_printf("<%s> %lu logger_printf took %lu ns\n",
-                   th, timespec_to_ns(after), elapsed_ns(before, after));
+        else count++;
     }
-
+    *tha->printed = count;
     return NULL;
 }
 
@@ -166,54 +171,75 @@ int main(int argc, char **argv)
 
     struct timespec before, after;
     clock_gettime(CLOCK_MONOTONIC, &before);
-    dbg_printf("For reference, the call to fprintf(stderr,...) to print this line took: ");
+    dbg_printf("For reference, the call to dbg_printf() to print this line took: ");
     clock_gettime(CLOCK_MONOTONIC, &after);
     dbg_printf("%lu ns\n\n", elapsed_ns(before, after));
+
+    /* Writer threads */
+    char          tnm[thp.thread_max][LOGGER_MAX_THREAD_NAME_SZ]; // Thread NaMes
+    pthread_t     tid[thp.thread_max]; // Thread IDs
+    _thread_args  tha[thp.thread_max]; // THread Args
+    unsigned int  twk[thp.thread_max]; // Thread WorK (lines asked to log)
+    unsigned int  tpr[thp.thread_max]; // Thread PRinted (lines really logged)
+    unsigned long dispatched_lines = 0;
+    unsigned long printed_lines = 0;
+
+    for (int i=0 ; i < thp.thread_max ; i++ ) {
+        snprintf(tnm[i], LOGGER_MAX_THREAD_NAME_SZ, "writer-thd-%04d", (char)i);
+        tha[i].params = &thp;
+        tha[i].work = &twk[i];
+        tha[i].printed = &tpr[i];
+        tid[i] = tpr[i] = twk[i] = 0;
+    }
 
     logger_init(thp.thread_max * 5, 50, LOGGER_LEVEL_DEFAULT, LOGGER_OPT_NONE);
     sleep(start_wait);
 
-    /* Writer threads */
-    pthread_t tid[thp.thread_max];
-    char      tnm[thp.thread_max][LOGGER_MAX_THREAD_NAME_SZ];
-    unsigned long printed_lines = 0;
+    int running;
 
-    for (int i=0 ; i < thp.thread_max ; i++ ) {
-        int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
+    do {
+        running = thp.thread_max;
 
-        snprintf(tnm[i], LOGGER_MAX_THREAD_NAME_SZ, "writer-thd-%04d", (char)i);
-        logger_pthread_create(tnm[i], queue_size, thp.opts,
-                                    &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
-
-        printed_lines += thp.print_max;
-    }
-    while ( printed_lines < thp.lines_total ) {
         for (int i=0 ; i < thp.thread_max ; i++ ) {
-            if ( tid[i] && pthread_tryjoin_np(tid[i], NULL) ) {
-                // Not yet terminated
-                continue;
+            if ( tid[i] ) {
+                if ( !tpr[i] ) {
+                    // Not finished yet ...
+                    continue;
+                }
+                if ( pthread_join(tid[i], NULL) < 0 ) {
+                    dbg_printf("Thread %02d: pthread_join(%lu,NULL): %m\n", i, tid[i]);
+                    exit(1);
+                }
+                if ( tpr[i] != twk[i] ) {
+                    dbg_printf("Thread %02d did not printed all the lines ! Asked %u got %u (lost %u) ?!\n",
+                        i, twk[i], tpr[i], twk[i] - tpr[i]);
+                }
+                printed_lines += tpr[i];
+                tid[i] = tpr[i] = twk[i] = 0;
             }
-            if ( printed_lines < thp.lines_total ) {
-                // Not the right amount... Restart the exited thread
+            if ( dispatched_lines < thp.lines_total ) {
+                // There are still lines to dispatch... (Re)starting a new thread
                 int queue_size = thp.lines_min + rand() % (thp.lines_max - thp.lines_min + 1);
+                int workset = (thp.lines_total - dispatched_lines) % thp.print_max;
+
+                workset = workset ?: thp.print_max;
+                twk[i] = workset; // Take in account the remaining lines
+
                 logger_pthread_create(tnm[i], queue_size, thp.opts,
-                                        &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
-                printed_lines += thp.print_max;
-                dbg_printf("Restarting thread %02d ...\n", i);
-                continue;
+                    &tid[i], NULL, (void *)thread_func_write, (void *)&tha[i]);
+
+                dispatched_lines += workset;
+                dbg_printf("(Re)starting thread %02d (workset = %u)...\n", i, workset);
             }
-            tid[i] = 0;
+            else running--;
         }
         usleep(100);
     }
-    for (int i=0 ; i < thp.thread_max ; i++ ) {
-        if ( tid[i] ) {
-            // If not yet terminated, waiting for him ...
-            pthread_join(tid[i], NULL);
-        }
-    }
+    while ( running );
+
     logger_deinit();
 
-    dbg_printf("%lu total printed lines ...\n", printed_lines);
+    dbg_printf("%lu total lines dispatched and %lu lines printed (%lu lost) ...\n",
+                dispatched_lines, printed_lines, dispatched_lines - printed_lines);
     return 0;
 }

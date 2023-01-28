@@ -373,8 +373,6 @@ reindex:
     l->line = line;
     vsnprintf(l->str, sizeof(l->str), format, ap);
 
-    dbg_printf("<%s> '%s' (%d)\n", _own_wrq->thread_name, l->str, _own_wrq->queue_idx);
-
     l->ready = true;
     _own_wrq->wr_seq++;
 

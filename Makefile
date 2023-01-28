@@ -4,8 +4,8 @@ SRC := logger.c logger-thread.c main.c logger-colors.c
 
 CC ?= gcc
 
-#ARGC += -Og -ggdb
 ARGC += -O3
+#ARGC += -O0 -ggdb
 #ARGC += -save-temps
 
 DEFINES += -DLOGGER_USE_THREAD

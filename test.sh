@@ -20,24 +20,22 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-default=()
-
 # NOTE! Don't change the order of the definitions below.
 
 default+=(5)		# <threads>	Number of concurrent threads to keep running to print <total> lines.
-default+=(50)		# <qmin>	Minimum size (in lines) of the queue to allocate per thread.
-default+=(200)		# <qmax>	Maximum size (in linesà of the queue to allocate per thread. The size is allocated between <qmin> and <qmax>.
+default+=(1000)		# <qmin>	Minimum size (in lines) of the queue to allocate per thread.
+default+=(1000)		# <qmax>	Maximum size (in lines) of the queue to allocate per thread. The size is allocated between <qmin> and <qmax>.
 default+=(100000)	# <total>	Total number of lines to print, using <threads> producers
-default+=(500)		# <max/thd>	Maximum of lines to process per thread. A new one is allocated using a new queue, with a size betwen <qmin> and <qmax>.
-default+=(100)		# <wait>	Penality (time in micro seconds) the thread will wait when it has no <chance>.
-default+=(10)		# <chance>	On each printed line, wait <wait> micro seconds 1 time on <chance> (simulate a more "realistic" logging)
+default+=(1000)		# <max/thd>	Maximum of lines to process per thread. A new one is allocated using a new queue, with a size betwen <qmin> and <qmax>.
+default+=(100)		# <wait>	Penality (time in micro seconds) the thread will have to wait when it has no <chance>.
+default+=(1000)		# <chance>	1 chance on <chance> to have to wait <wait> us (try to simulate a more "realistic" logging)
 
 # The following options are bolleans. Enabled = 1, Disabled = 0
 
-default+=(0)	# [non-blocking] Non-blocking mode. Wait when the queue is full (blocking) or loose the line (non-blocking).
-default+=(0)	# [print lost]   If non-blocking mode is enabled, print the number of lines lost so far, soon as the queue is not empty anymore.
-default+=(0)	# [noqueue]	 Start of the threads with no queue assignment. Done at the first logger_printlog() call.
-default+=(0)	# [prealloc]	 Fills the allocated queues with garbage to force Linux to reserve the page (copy-on-write workaround).
+default+=(0)	# [non-blocking] Non-blocking mode. Return with an error instead of waiting for free space (blocking).
+default+=(0)	# [print lost]   In non-blocking mode, print the number of lines lost so far soon as it can.
+default+=(0)	# [noqueue]	 Start of the threads with no queue assignment. Done at the first logger_printlog() call with the default queue size.
+default+=(1)	# [prealloc]	 Fills the allocated queues with garbage to force Linux to reserve the page (copy-on-write workaround).
 default+=(3) 	# [delay sec]    Start time delay ...
 
 # You can specify your own parameters on the command line, the have precedence.
