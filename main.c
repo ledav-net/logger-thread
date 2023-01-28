@@ -164,7 +164,7 @@ int main(int argc, char **argv)
     clock_gettime(CLOCK_MONOTONIC, &after);
     fprintf(stderr, "%lu ns\n\n", elapsed_ns(before, after));
 
-    logger_init(thp.thread_max * 1.5, 50, LOGGER_LEVEL_DEFAULT, LOGGER_OPT_NONE);
+    logger_init(thp.thread_max * 5, 50, LOGGER_LEVEL_DEFAULT, LOGGER_OPT_NONE);
     sleep(start_wait);
 
     /* Writer threads */

@@ -255,6 +255,8 @@ static void _logger_pthread_wrapper(_thread_params *params)
          * Oops!  If this happen, it could mean the limit of queues to
          * allocate is too low !!
          */
+        fprintf(stderr, "<%s> No space to allocate a new queue of %d lines !\n",
+                        params->thread_name, params->max_lines);
         pthread_exit(NULL);
     }
     /**
