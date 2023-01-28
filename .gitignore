@@ -2,3 +2,5 @@ logger
 *.log
 tags
 core*
+*.[iso]
+*~
