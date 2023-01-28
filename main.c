@@ -29,13 +29,19 @@
 
 #include "logger.h"
 
+// Comment this to turn off the debug lines to stderr for this source.
+#define _DEBUG_LOGGER
+
+#ifdef _DEBUG_LOGGER
+#define dbg_printf(args...) fprintf(stderr, args)
+#else
+#define dbg_printf(...)
+#endif
+
 #define NTOS(v) ((v)/1000000000) /* nSec -> Sec  */
 #define STON(v) ((v)*1000000000) /*  Sec -> nSec */
 #define MTON(v) ((v)*1000000)    /* mSec -> nSec */
 #define MTOU(v) ((v)*1000)       /* mSec -> uSec */
-
-// Uncomment to strip all the debug lines for this source.
-//#define fprintf(...)
 
 typedef struct {
     unsigned long print_max;
@@ -57,7 +63,7 @@ static void *thread_func_write(const _thread_params *thp)
 
     for (int seq = 0; seq < thp->print_max; seq++) {
         if (!(rand() % thp->chances)) {
-            fprintf(stderr, "<%s> Bad luck, waiting for %d usec\n", th, thp->uwait);
+            dbg_printf("<%s> Bad luck, waiting for %d usec\n", th, thp->uwait);
             usleep(thp->uwait);
         }
         struct timespec before, after;
@@ -95,11 +101,11 @@ static void *thread_func_write(const _thread_params *thp)
         clock_gettime(CLOCK_MONOTONIC, &after);
 
         if ( r < 0 ) {
-            fprintf(stderr, "<%s> %d **LOST** (%m)\n", th, seq);
+            dbg_printf("<%s> Message #%d **LOST** (%m)\n", th, seq);
         }
 
-        fprintf(stderr, "<%s> %lu logger_printf took %lu ns\n",
-                        th, timespec_to_ns(after), elapsed_ns(before, after));
+        dbg_printf("<%s> %lu logger_printf took %lu ns\n",
+                   th, timespec_to_ns(after), elapsed_ns(before, after));
     }
 
     return NULL;
@@ -149,20 +155,20 @@ int main(int argc, char **argv)
     }
     srand(time(NULL));
 
-    fprintf(stderr, "cmdline: "); for (int i=0; i<argc; i++) { fprintf(stderr, "%s ", argv[i]); }
-    fprintf(stderr, "\nthreads[%d] q_min[%d] q_max[%d] lines_total[%d] max_lines/thr[%lu] (1/%d chances to wait %d us)%s%s%s%s\n"
-                    , thp.thread_max, thp.lines_min, thp.lines_max, thp.lines_total, thp.print_max, thp.chances, thp.uwait
-                    , thp.opts & LOGGER_OPT_NONBLOCK  ? " non-blocking" : ""
-                    , thp.opts & LOGGER_OPT_PRINTLOST ? "+printlost"    : ""
-                    , thp.opts & LOGGER_OPT_NOQUEUE   ? " noqueue"      : ""
-                    , thp.opts & LOGGER_OPT_PREALLOC  ? " prealloc"     : "");
-    fprintf(stderr, "Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
+    dbg_printf("cmdline: "); for (int i=0; i<argc; i++) { dbg_printf("%s ", argv[i]); }
+    dbg_printf("\nthreads[%d] q_min[%d] q_max[%d] lines_total[%d] max_lines/thr[%lu] (1/%d chances to wait %d us)%s%s%s%s\n",
+                thp.thread_max, thp.lines_min, thp.lines_max, thp.lines_total, thp.print_max, thp.chances, thp.uwait,
+                thp.opts & LOGGER_OPT_NONBLOCK  ? " non-blocking" : "",
+                thp.opts & LOGGER_OPT_PRINTLOST ? "+printlost"    : "",
+                thp.opts & LOGGER_OPT_NOQUEUE   ? " noqueue"      : "",
+                thp.opts & LOGGER_OPT_PREALLOC  ? " prealloc"     : "");
+    dbg_printf("Waiting for %d seconds after the logger-reader thread is started\n\n", start_wait);
 
     struct timespec before, after;
     clock_gettime(CLOCK_MONOTONIC, &before);
-    fprintf(stderr, "For reference, the call to fprintf(stderr,...) to print this line took: ");
+    dbg_printf("For reference, the call to fprintf(stderr,...) to print this line took: ");
     clock_gettime(CLOCK_MONOTONIC, &after);
-    fprintf(stderr, "%lu ns\n\n", elapsed_ns(before, after));
+    dbg_printf("%lu ns\n\n", elapsed_ns(before, after));
 
     logger_init(thp.thread_max * 5, 50, LOGGER_LEVEL_DEFAULT, LOGGER_OPT_NONE);
     sleep(start_wait);
@@ -193,7 +199,7 @@ int main(int argc, char **argv)
                 logger_pthread_create(tnm[i], queue_size, thp.opts,
                                         &tid[i], NULL, (void *)thread_func_write, (void *)&thp);
                 printed_lines += thp.print_max;
-                fprintf(stderr, "Restarting thread %02d ...\n", i);
+                dbg_printf("Restarting thread %02d ...\n", i);
                 continue;
             }
             tid[i] = 0;
@@ -208,6 +214,6 @@ int main(int argc, char **argv)
     }
     logger_deinit();
 
-    fprintf(stderr, "%lu total printed lines ...\n", printed_lines);
+    dbg_printf("%lu total printed lines ...\n", printed_lines);
     return 0;
 }

@@ -36,6 +36,15 @@
 #include "logger.h"
 #include "logger-thread.h"
 
+// Comment this to turn off the debug lines to stderr for this source.
+//#define _DEBUG_LOGGER
+
+#ifdef _DEBUG_LOGGER
+#define dbg_printf(args...) fprintf(stderr, args)
+#else
+#define dbg_printf(...)
+#endif
+
 static const char * const _logger_level_label[LOGGER_LEVEL_COUNT] = {
     [LOGGER_LEVEL_EMERG]    = "EMERG",
     [LOGGER_LEVEL_ALERT]    = "ALERT",
@@ -54,9 +63,6 @@ typedef struct {
     unsigned long         ts;  /* Key to sort on (ts of current line) */
     logger_write_queue_t *wrq; /* Related write queue */
 } _logger_fuse_entry_t;
-
-// Uncomment to strip all the debug lines for this source.
-//#define fprintf(...)
 
 static const char *_logger_get_date(unsigned long sec, const logger_line_colors_t *c)
 {
@@ -199,7 +205,7 @@ void *_thread_logger(void)
 {
     bool running = logger.running;
 
-    fprintf(stderr, "<logger-thd-read> Starting...\n");
+    dbg_printf("<logger-thd-read> Starting...\n");
 
     while (running) {
         int empty_nr = 0;
@@ -207,10 +213,10 @@ void *_thread_logger(void)
         int fuse_nr = logger.queues_nr;
 
         if (!fuse_nr) {
-            fprintf(stderr, "<logger-thd-read> Wake me up when there is somet'n... Zzz\n");
+            dbg_printf("<logger-thd-read> Wake me up when there is somet'n... Zzz\n");
             atomic_store(&logger.waiting, 1);
             if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
-                fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
+                dbg_printf("<logger-thd-read> ERROR: %m !\n");
                 break;
             }
             if (!logger.running) {
@@ -221,7 +227,7 @@ void *_thread_logger(void)
         }
         _logger_fuse_entry_t fuse_queue[fuse_nr];
 
-        fprintf(stderr, "<logger-thd-read> (Re)Loading... _logger_fuse_entry_t = %d x %lu bytes (%lu bytes total)\n",
+        dbg_printf("<logger-thd-read> (Re)Loading... _logger_fuse_entry_t = %d x %lu bytes (%lu bytes total)\n",
                         fuse_nr, sizeof(_logger_fuse_entry_t), sizeof(fuse_queue));
 
         empty_nr = _logger_init_lines_queue(fuse_queue, fuse_nr);
@@ -241,7 +247,7 @@ void *_thread_logger(void)
                 }
                 if (really_empty < 5) {
                     int wait = 1 << really_empty++;
-                    fprintf(stderr, "<logger-thd-read> Print queue empty. Double check in %d us ...\n", wait);
+                    dbg_printf("<logger-thd-read> Print queue empty. Double check in %d us ...\n", wait);
                     usleep(wait);
                     /**
                      * Double-check multiple times if the queue is really empty.
@@ -252,10 +258,10 @@ void *_thread_logger(void)
                     continue;
                 }
                 really_empty = 0;
-                fprintf(stderr, "<logger-thd-read> Print queue REALLY empty ... Zzz\n");
+                dbg_printf("<logger-thd-read> Print queue REALLY empty ... Zzz\n");
                 atomic_store(&logger.waiting, 1);
                 if (futex_wait(&logger.waiting, 1) < 0 && errno != EAGAIN) {
-                    fprintf(stderr, "<logger-thd-read> ERROR: %m !\n");
+                    dbg_printf("<logger-thd-read> ERROR: %m !\n");
                     running = false;
                     break;
                 }
@@ -265,18 +271,17 @@ void *_thread_logger(void)
             really_empty = 0;
 
             logger_write_queue_t *wrq = fuse_queue[0].wrq;
-            int rv = _logger_write_line(wrq, &wrq->lines[wrq->rd_idx]);
-            if (rv < 0) {
-                fprintf(stderr, "<logger-thd-read> logger_write_line(): %m\n");
+            if ( _logger_write_line(wrq, &wrq->lines[wrq->rd_idx]) < 0 ) {;
                 /**
-                 * In this case we loose the line but we continue to empty the queues ...
+                 * In this case we loose the line but we must continue to empty the queues ...
                  * otherwise all the queues gets full and all the threads are stuck on it
-                 * (this can happen if the disk is full ...)
+                 * (this can happen if the disk is full, terminal stuck, ...)
                  */
+                dbg_printf("<logger-thd-read> logger_write_line(): %m\n");
             }
         }
     }
-    fprintf(stderr, "<logger-thd-read> Exit\n");
+    dbg_printf("<logger-thd-read> Exit\n");
     return NULL;
 }
 #endif

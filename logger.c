@@ -38,8 +38,14 @@
 #include "logger.h"
 #include "logger-thread.h"
 
-// Uncomment to strip all the debug lines for this source.
-#define fprintf(...)
+// Comment this to turn off the debug lines to stderr for this source.
+//#define _DEBUG_LOGGER
+
+#ifdef _DEBUG_LOGGER
+#define dbg_printf(args...) fprintf(stderr, args)
+#else
+#define dbg_printf(...)
+#endif
 
 logger_t logger;
 
@@ -119,23 +125,23 @@ void logger_deinit(void)
 {
     /* Sync with the logger & force him to double-check the queues */
     while (!logger.waiting) {
-        fprintf(stderr, "Waiting for logger ...\n");
+        dbg_printf("Waiting for logger ...\n");
         usleep(100);
     }
     logger.running = false;
     atomic_store(&logger.waiting, 0);
     int r = futex_wake(&logger.waiting, 1);
     if (r <= 0) {
-        fprintf(stderr, "Logger already woke up ?! (r=%d, %m)\n", r);
+        dbg_printf("Logger already woke up ?! (r=%d, %m)\n", r);
     }
-    fprintf(stderr, "Joining logger ...\n");
+    dbg_printf("Joining logger ...\n");
     pthread_join(logger.reader_thread, NULL);
-#ifndef fprintf
+#ifdef _DEBUG_LOGGER
     int total = 0;
     for (int i = 0; i < logger.queues_nr; i++) {
         total += sizeof(logger_write_queue_t) + logger.queues[i]->lines_nr * sizeof(logger_line_t);
     }
-    fprintf(stderr, "total memory allocated for %d queues = %d kb\n", logger.queues_nr, total/1024);
+    dbg_printf("total memory allocated for %d queues = %d kb\n", logger.queues_nr, total/1024);
 #endif
     for (int i=0 ; i<logger.queues_nr; i++) {
         free(logger.queues[i]->lines);
@@ -177,13 +183,13 @@ retry:
     if (fwrq) {
         if (!atomic_compare_exchange_strong(&fwrq->free, &(atomic_int){ 1 }, 0)) {
             /* Race condition, another thread took it right before us. Trying another one */
-            fprintf(stderr, "<?> Race condition when trying to reuse queue %d ! Retrying...\n", fwrq->queue_idx);
+            dbg_printf("<?> Race condition when trying to reuse queue %d ! Retrying...\n", fwrq->queue_idx);
             goto retry;
         }
         _logger_set_thread_name(fwrq);
         fwrq->opts = opts ?: logger.opts;
 
-        fprintf(stderr, "<%s> Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
+        dbg_printf("<%s> Reusing queue %d: lines_max[%d] queue_nr[%d]\n",
                         fwrq->thread_name, fwrq->queue_idx, lines_max, fwrq->lines_nr);
     } else {
         /* No free queue that fits our needs... Adding a new one. */
@@ -191,7 +197,7 @@ retry:
         if (!fwrq) {
             return -1;
         }
-        fprintf(stderr, "<%s> New queue allocated: %d = %d x %lu bytes (%lu kb allocated)\n",
+        dbg_printf("<%s> New queue allocated: %d = %d x %lu bytes (%lu kb allocated)\n",
                         fwrq->thread_name, fwrq->queue_idx, lines_max, sizeof(logger_line_t),
                         (lines_max * sizeof(logger_line_t)) >> 10);
     }
@@ -203,7 +209,7 @@ static inline int _logger_wakeup_reader_if_needed(void)
 {
     if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
         /* Wake-up lazy guy, there is something to do ! */
-        fprintf(stderr, "<%s> Waking up the logger ...\n", _own_wrq->thread_name);
+        dbg_printf("<%s> Waking up the logger ...\n", _own_wrq->thread_name);
         if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
             return -1;
         }
@@ -218,7 +224,7 @@ int logger_free_write_queue(void)
         /* No queue allocated. Nothing to do ... */
         return 0;
     }
-    fprintf(stderr, "<%s> Freeing queue %d ...\n", _own_wrq->thread_name, _own_wrq->queue_idx);
+    dbg_printf("<%s> Freeing queue %d ...\n", _own_wrq->thread_name, _own_wrq->queue_idx);
     while (_own_wrq->rd_seq != _own_wrq->wr_seq) {
         if (_logger_wakeup_reader_if_needed() < 0) {
             return -1;
@@ -255,7 +261,7 @@ static void _logger_pthread_wrapper(_thread_params *params)
          * Oops!  If this happen, it could mean the limit of queues to
          * allocate is too low !!
          */
-        fprintf(stderr, "<%s> No space to allocate a new queue of %d lines !\n",
+        dbg_printf("<%s> No space to allocate a new queue of %d lines !\n",
                         params->thread_name, params->max_lines);
         pthread_exit(NULL);
     }
@@ -330,7 +336,7 @@ reindex:
     l = &_own_wrq->lines[index];
 
     while (l->ready) {
-        fprintf(stderr, "<%s> Queue full ... (%d)\n", _own_wrq->thread_name, _own_wrq->queue_idx);
+        dbg_printf("<%s> Queue full ... (%d)\n", _own_wrq->thread_name, _own_wrq->queue_idx);
 
         int ret = _logger_wakeup_reader_if_needed();
         if (ret > 0) {
@@ -342,7 +348,7 @@ reindex:
         }
         if (_own_wrq->opts & LOGGER_OPT_NONBLOCK) {
             _own_wrq->lost++;
-            fprintf(stderr, "<%s> Line dropped (%lu %s) !\n", _own_wrq->thread_name, _own_wrq->lost,
+            dbg_printf("<%s> Line dropped (%lu %s) !\n", _own_wrq->thread_name, _own_wrq->lost,
                     _own_wrq->opts & LOGGER_OPT_PRINTLOST ? "since last print" : "so far");
             return errno = EAGAIN, -1;
         }
@@ -367,7 +373,7 @@ reindex:
     l->line = line;
     vsnprintf(l->str, sizeof(l->str), format, ap);
 
-    fprintf(stderr, "<%s> '%s' (%d)\n", _own_wrq->thread_name, l->str, _own_wrq->queue_idx);
+    dbg_printf("<%s> '%s' (%d)\n", _own_wrq->thread_name, l->str, _own_wrq->queue_idx);
 
     l->ready = true;
     _own_wrq->wr_seq++;
