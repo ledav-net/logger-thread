@@ -5,13 +5,21 @@
 
 * Let the writer threads as free as possible (no mutexes, limited atomics)
 * Send output lines per lines in an atomic manner (human monitoring)
+* Guarantee the chronological order and accuracy of the time stamps
 * The reader thread consume as less ressources as possible
-* Limit the amount of memory consumed by reusing queues
 * Memory allocated one time for all at thread creation time
-* Easy pthread_create wrapper to handle internal house keeping transparently
-* Easy to remove all the logging (or some levels) by changing defines
-* Easy to switch between the classical full text or ansi colors
+* Limit the amount of memory consumed by reusing queues
 * Log levels are compatible with syslog
+
+### Main features ###
+
+* Easy pthread_create wrapper to handle internal house keeping transparently
+* The logger can be completely disabled using defines at compile time
+* Also using defines, switch to a simple "printf" logging without logger thread
+* You can drop the code above the minimal level at compile time
+* And also filter the lines at runtime by changing the min. level to print
+* Switch between the classical color themes or b/w
+* ...
 
 ### Main logic / idea ###
 
@@ -40,16 +48,26 @@ for more parallelism in multi core environments.
 
 The queues can be finetuned when the thread is forked.  More buffer the
 thread have, more burst loggings can be handled before forcing the writer
-thread to wait (or loose the line if non-blocking mode is enabled).
+thread to wait (blocking mode).
 
-The queue can also be allowed to loose lines, avoiding the thread to block
-until some space are freeed.
+A non-blocking mode can also be set to return an error when the queue is
+full.  Also, for convenience / easy tracing, another option is there to log
+the number of lost lines soon as some more space is free.  This allows you
+to know the queue was too small at a certain point in time and maybe fine
+tune the buffer size for that thread or debug why this is happening at these
+times ...
 
-For convenience / easy tracing, another option is there to log the number of
-lost lines soon as some more space is free.  This allows you to know the
-queue was too small at a certain point in time and maybe fine tune the
-buffer size for that thread or debug why this is happening at these times
-...
+To optimize the (re)use of the queues, threads can also be started with no
+queue assigned and assigned it at the time of the 1st print.  This could be
+useful in case you know that a short lived thread can eventually log
+something, etc.
+
+Another option let you preallocate the memory used by the queues (so
+basically bypassing the copy-on-write feature of the kernel) to don't have
+the thread loosing time when it have to allocate a page to the process.
+
+The test script can be used with various senarios to see how it react and
+which option to choose in some contexts.
 
 As stated, the main goal of this logger is to minimize as much as possible
 the time spent by the threads to log something on the terminal or on slow
