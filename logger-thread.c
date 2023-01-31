@@ -235,7 +235,7 @@ void *_thread_logger(void)
         while (1) {
             empty_nr = _logger_enqueue_next_lines(fuse_queue, fuse_nr, empty_nr);
 
-            if (atomic_compare_exchange_strong(&logger.reload, &(atomic_int){ 1 }, 0)) {
+            if (atomic_compare_exchange_strong(&logger.reload, &(int){ 1 }, 0)) {
                 break;
             }
             if (fuse_queue[0].ts == ~0) {

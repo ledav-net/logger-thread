@@ -95,7 +95,7 @@ logger_write_queue_t *_logger_alloc_write_queue(int lines_max, logger_opts_t opt
     pthread_mutex_unlock(&logger.queues_mx);
 
     /* Let the logger thread take this change into account when he can ... */
-    atomic_compare_exchange_strong(&logger.reload, &(atomic_int){ 0 }, 1);
+    atomic_compare_exchange_strong(&logger.reload, &(int){ 0 }, 1);
     return wrq;
 }
 
@@ -181,7 +181,7 @@ retry:
         }
     }
     if (fwrq) {
-        if (!atomic_compare_exchange_strong(&fwrq->free, &(atomic_int){ 1 }, 0)) {
+        if (!atomic_compare_exchange_strong(&fwrq->free, &(int){ 1 }, 0)) {
             /* Race condition, another thread took it right before us. Trying another one */
             dbg_printf("<?> Race condition when trying to reuse queue %d ! Retrying...\n", fwrq->queue_idx);
             goto retry;
@@ -207,7 +207,7 @@ retry:
 
 static inline int _logger_wakeup_reader_if_needed(void)
 {
-    if (atomic_compare_exchange_strong(&logger.waiting, &(atomic_int){ 1 }, 0)) {
+    if (atomic_compare_exchange_strong(&logger.waiting, &(int){ 1 }, 0)) {
         /* Wake-up lazy guy, there is something to do ! */
         dbg_printf("<%s> Waking up the logger ...\n", _own_wrq->thread_name);
         if (futex_wake(&logger.waiting, 1) < 0) { /* (the only) 1 waiter to wakeup  */
