@@ -66,4 +66,7 @@
 #define C_BC	"\033[46m"	/* Background Cyan */
 #define C_BW	"\033[47m"	/* Background White */
 
+#define C_256(color)   "\033[38;5;" # color "m"      /* 256 colors */
+#define C_B256(color)  "\033[38;5;" # color "m"      /* 256 colors (background) */
+
 #endif
